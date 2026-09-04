@@ -51,7 +51,6 @@ beforeAll(async () => {
     commit: v1,
     integrity: integrityOf(files),
     mode: "auto",
-    installedAt: "",
   };
 
   await writeFile(join(upstream, "skills", "demo", "SKILL.md"), "v2\n");
@@ -219,7 +218,6 @@ const outdatedStatus = (name: string): OutdatedVerdict => ({
     commit: "a".repeat(40),
     integrity: "sha256-qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqo=",
     mode: "auto",
-    installedAt: "",
   },
   source: sourceFor("r"),
   upstream: { commit: "b".repeat(40), branch: "main", mode: "auto" as const },

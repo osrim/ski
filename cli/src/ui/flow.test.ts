@@ -46,7 +46,6 @@ test("lands later items after a failure, writes the lock, and hides links", asyn
         path: "",
         integrity: "sha256-qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqo=",
         mode: "auto",
-        installedAt: "2026-09-03T00:00:00Z",
       };
       return Promise.resolve({ success: "worked" });
     },

@@ -33,7 +33,6 @@ const row = (name: string, agents?: AgentId[]): LockEntry & { name: string } => 
   path: "",
   integrity,
   mode: "auto",
-  installedAt: "2026-01-01T00:00:00.000Z",
   ...(agents ? { copy: true, agents } : {}),
 });
 

@@ -69,7 +69,6 @@ export const applySkill = async (
       ...(target.copy
         ? { copy: true, agents: [...new Set([...target.copy.managed, ...target.agents])] }
         : {}),
-      installedAt: new Date().toISOString(),
     };
   }
   return { backedUp, integrity, restored };

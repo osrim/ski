@@ -33,7 +33,6 @@ const entry = {
   commit: "a".repeat(40),
   integrity,
   mode: "auto" as const,
-  installedAt: "2026-08-03T12:00:00Z",
 };
 
 const local = {
@@ -41,7 +40,6 @@ const local = {
   path: "",
   integrity,
   mode: "auto" as const,
-  installedAt: "2026-08-03T12:00:00Z",
 };
 
 const inDir = async <T>(dir: string, fn: () => T | Promise<T>): Promise<T> => {
@@ -83,7 +81,6 @@ test("roundtrip preserves entries; entries are sorted by name; keys in row order
         integrity,
         mode: "pin",
         pinnedAs: "v1",
-        installedAt: entry.installedAt,
       },
       bare: {
         source: entry.source,
@@ -92,14 +89,12 @@ test("roundtrip preserves entries; entries are sorted by name; keys in row order
         commit: entry.commit,
         integrity,
         mode: "auto",
-        installedAt: entry.installedAt,
       },
       mine: {
         source: "local:./skills/mine",
         path: "",
         integrity,
         mode: "auto",
-        installedAt: entry.installedAt,
       },
       zeta: {
         source: entry.source,
@@ -109,7 +104,6 @@ test("roundtrip preserves entries; entries are sorted by name; keys in row order
         integrity,
         mode: "auto",
         tag: "v1.2.0",
-        installedAt: entry.installedAt,
       },
     },
   });
@@ -120,20 +114,11 @@ test("roundtrip preserves entries; entries are sorted by name; keys in row order
   const keys = Object.keys(
     (JSON.parse(raw) as { skills: Record<string, object> }).skills["alpha"]!,
   );
-  expect(keys).toEqual([
-    "source",
-    "branch",
-    "path",
-    "commit",
-    "integrity",
-    "mode",
-    "pinnedAs",
-    "installedAt",
-  ]);
+  expect(keys).toEqual(["source", "branch", "path", "commit", "integrity", "mode", "pinnedAs"]);
   const localKeys = Object.keys(
     (JSON.parse(raw) as { skills: Record<string, object> }).skills["mine"]!,
   );
-  expect(localKeys).toEqual(["source", "path", "integrity", "mode", "installedAt"]);
+  expect(localKeys).toEqual(["source", "path", "integrity", "mode"]);
 });
 
 test("a copy row keeps copy and agents through a round trip, in the documented key order", async () => {
@@ -155,7 +140,6 @@ test("a copy row keeps copy and agents through a round trip, in the documented k
     "mode",
     "copy",
     "agents",
-    "installedAt",
   ]);
   await writeLock("global", { lockfileVersion: 1, skills: { tdd: entry } });
   expect(await readFile(lockPath("global"), "utf8")).not.toContain("copy");
@@ -204,13 +188,13 @@ test("parse errors: bad version, unparseable JSON, bad mode, missing or non-SRI 
   );
   expect(() =>
     parseLock(
-      `{"lockfileVersion":1,"skills":{"a":{"source":"r","branch":"main","path":"","sha":"${"a".repeat(40)}","mode":"auto","installedAt":"x"}}}`,
+      `{"lockfileVersion":1,"skills":{"a":{"source":"r","branch":"main","path":"","sha":"${"a".repeat(40)}","mode":"auto"}}}`,
       "ski-lock.json",
     ),
   ).toThrow("ski-lock.json: a: missing integrity");
   expect(() =>
     parseLock(
-      `{"lockfileVersion":1,"skills":{"a":{"source":"r","path":"","integrity":"sha256:${"f".repeat(64)}","mode":"auto","installedAt":"x"}}}`,
+      `{"lockfileVersion":1,"skills":{"a":{"source":"r","path":"","integrity":"sha256:${"f".repeat(64)}","mode":"auto"}}}`,
       "ski-lock.json",
     ),
   ).toThrow("ski-lock.json: a: integrity must be sha256-<base64>");
@@ -245,7 +229,7 @@ test("projectRoot falls back to cwd when nothing is found", async () => {
 
 test("parse errors: unsafe skill names and inconsistent copy configuration", () => {
   const lock = (name: string, extra = ""): string =>
-    `{"lockfileVersion":1,"skills":{${JSON.stringify(name)}:{"source":"r","path":"","integrity":"${integrity}","mode":"auto","installedAt":"x"${extra}}}}`;
+    `{"lockfileVersion":1,"skills":{${JSON.stringify(name)}:{"source":"r","path":"","integrity":"${integrity}","mode":"auto"${extra}}}}`;
   expect(() => parseLock(lock(""), "f")).toThrow('f: invalid skill name ""');
   expect(() => parseLock(lock("."), "f")).toThrow('f: invalid skill name "."');
   expect(() => parseLock(lock(".."), "f")).toThrow('f: invalid skill name ".."');
@@ -267,9 +251,15 @@ test("parse errors: unsafe skill names and inconsistent copy configuration", () 
       path: "",
       integrity,
       mode: "auto",
-      installedAt: "x",
       copy: true,
       agents: ["claude"],
     },
   });
+});
+
+test("a lockfile carrying installedAt loads without it and re-serializes without it", () => {
+  const text = `{"lockfileVersion":1,"skills":{"tdd":{"source":"r","path":"","integrity":"${integrity}","mode":"auto","installedAt":"2026-08-03T12:00:00Z"}}}`;
+  const parsed = parseLock(text, "ski-lock.json");
+  expect(parsed.skills["tdd"]).toEqual({ source: "r", path: "", integrity, mode: "auto" });
+  expect(serializeLock(parsed)).not.toContain("installedAt");
 });

@@ -65,7 +65,6 @@ test("applySkill caches, writes the canonical copy, links relatively, and record
   expect(entry.integrity).toBe(integrity);
   expect(entry.mode).toBe("auto");
   expect(entry.tag).toBe("v1.0.0");
-  expect(Date.parse(entry.installedAt)).toBeGreaterThan(0);
   expect(existsSync(storeEntryPath("https://github.com/o/r", "demo", integrity))).toBe(true);
   expect((await lstat(canonicalPath("demo", "global"))).isDirectory()).toBe(true);
   expect(await readFile(join(canonicalPath("demo", "global"), "SKILL.md"), "utf8")).toBe("hello\n");
@@ -91,7 +90,6 @@ test("a local revision records neither commit nor branch", async () => {
     path: "",
     mode: "auto",
     integrity,
-    installedAt: lock.skills["loc"]!.installedAt,
   });
   expect("commit" in lock.skills["loc"]!).toBe(false);
   expect("branch" in lock.skills["loc"]!).toBe(false);

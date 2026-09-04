@@ -28,7 +28,6 @@ const installed = (
   path,
   integrity,
   mode: "auto",
-  installedAt: "",
 });
 
 beforeAll(async () => {

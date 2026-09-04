@@ -16,7 +16,6 @@ export interface LockEntry {
   tag?: string;
   copy?: true;
   agents?: AgentId[];
-  installedAt: string;
 }
 
 export interface Lockfile {
@@ -51,7 +50,6 @@ interface SerializedEntry {
   tag?: string | undefined;
   copy?: true | undefined;
   agents?: AgentId[] | undefined;
-  installedAt: string;
 }
 
 export const serializeLock = (lock: Lockfile): string => {
@@ -69,7 +67,6 @@ export const serializeLock = (lock: Lockfile): string => {
       tag: entry.tag,
       copy: entry.copy,
       agents: entry.agents,
-      installedAt: entry.installedAt,
     };
   }
   return `${JSON.stringify({ lockfileVersion: 1, skills }, null, 2)}\n`;
@@ -95,7 +92,6 @@ const EntrySchema = z
       .array(z.enum(AGENT_IDS))
       .nonempty({ error: "agents must name at least one agent" })
       .optional(),
-    installedAt: z.string(),
   })
   .refine((entry) => (entry.copy === undefined) === (entry.agents === undefined), {
     error: "copy and agents must appear together",
@@ -143,7 +139,6 @@ export const parseLock = (text: string, file: string): Lockfile => {
       ...(entry.tag === undefined ? {} : { tag: entry.tag }),
       ...(entry.copy === undefined ? {} : { copy: entry.copy }),
       ...(entry.agents === undefined ? {} : { agents: entry.agents }),
-      installedAt: entry.installedAt,
     };
   }
   return { lockfileVersion: 1, skills };

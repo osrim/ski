@@ -29,7 +29,6 @@ const row = (copy = false): LockEntry => ({
   path: "",
   integrity: "sha256-qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqo=",
   mode: "auto",
-  installedAt: "2026-01-01T00:00:00.000Z",
   ...(copy ? { copy: true, agents: ["claude"] } : {}),
 });
 
