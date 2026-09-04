@@ -2,8 +2,6 @@
 
 `ski` installs, updates, and links skills from Git or local directories straight into your favorite coding agent. It runs a security scan on every file before installation, and uses a `ski-lock.json` file to ensure everyone on your team runs the exact same reviewed code.
 
-<img width="1280" height="714" alt="ski-demo" src="https://github.com/user-attachments/assets/dea66a3e-8b8b-49d6-88a2-f95e07a5ef7e" />
-
 ## Get started
 
 ### 1. Install the CLI
