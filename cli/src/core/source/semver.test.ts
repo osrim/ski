@@ -13,6 +13,7 @@ test("parseSemver accepts semver-ish tags and rejects the rest", () => {
 });
 
 test("isNewerVersion compares the numbers, not the strings", () => {
+  expect(isNewerVersion("2.0.0", "1.10.0")).toBe(true);
   expect(isNewerVersion("1.10.0", "1.9.0")).toBe(true);
   expect(isNewerVersion("1.9.0", "1.10.0")).toBe(false);
   expect(isNewerVersion("1.2", "1.2.0")).toBe(false);
@@ -27,6 +28,10 @@ const tag = (name: string, commit = "x") => ({ name, commit });
 test("highest bare semver tag wins; prereleases are skipped", () => {
   const tags = [tag("v0.2.1"), tag("v0.5"), tag("v0.6.0-rc.1"), tag("not-a-version")];
   expect(pickLatestTag(tags, "skills")?.name).toBe("v0.5");
+});
+
+test("a lone prerelease tag is no tag at all", () => {
+  expect(pickLatestTag([tag("v1.2.3-rc.1")], "skills")).toBeNull();
 });
 
 test("monorepo-scoped tags are preferred over bare ones", () => {

@@ -5,12 +5,14 @@ interface SemVer {
   prerelease: boolean;
 }
 
+const SEMVER_TAG = /^[vV]?(\d+\.\d+)(?:\.(\d+))?([-+].*)?$/u;
+
 export const parseSemver = (input: string): SemVer | null => {
-  const match = input.match(/^[vV]?(\d+)\.(\d+)(?:\.(\d+))?([-+].*)?$/u);
+  const match = input.match(SEMVER_TAG);
   if (!match) return null;
   return {
-    version: `${match[1]}.${match[2]}.${match[3] ?? 0}${match[4] ?? ""}`,
-    prerelease: match[4]?.startsWith("-") ?? false,
+    version: `${match[1]}.${match[2] ?? 0}${match[3] ?? ""}`,
+    prerelease: match[3]?.startsWith("-") ?? false,
   };
 };
 
