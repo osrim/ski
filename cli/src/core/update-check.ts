@@ -31,6 +31,7 @@ const silenced = (json: boolean): boolean =>
   json ||
   !process.stdout.isTTY ||
   Boolean(process.env.CI) ||
+  Boolean(process.env.NO_UPDATE_NOTIFIER) ||
   Boolean(process.env.SKI_NO_UPDATE_NOTIFIER) ||
   inGitCheckout();
 

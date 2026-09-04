@@ -12,6 +12,7 @@ let tmp: string;
 let previousCache: string | undefined;
 let previousCi: string | undefined;
 let previousOptOut: string | undefined;
+let previousGlobalOptOut: string | undefined;
 let ttyDescriptor: PropertyDescriptor | undefined;
 let fetchDescriptor: PropertyDescriptor;
 let fetchMock: ReturnType<typeof mock>;
@@ -26,6 +27,7 @@ beforeAll(async () => {
   previousCache = process.env.XDG_CACHE_HOME;
   previousCi = process.env.CI;
   previousOptOut = process.env.SKI_NO_UPDATE_NOTIFIER;
+  previousGlobalOptOut = process.env.NO_UPDATE_NOTIFIER;
   ttyDescriptor = Object.getOwnPropertyDescriptor(process.stdout, "isTTY");
   fetchDescriptor = Object.getOwnPropertyDescriptor(globalThis, "fetch")!;
 });
@@ -34,6 +36,7 @@ beforeEach(async () => {
   process.env.XDG_CACHE_HOME = join(tmp, crypto.randomUUID());
   delete process.env.CI;
   delete process.env.SKI_NO_UPDATE_NOTIFIER;
+  delete process.env.NO_UPDATE_NOTIFIER;
   Object.defineProperty(process.stdout, "isTTY", { configurable: true, value: true });
   spyOn(fs, "existsSync").mockReturnValue(false);
   spyOn(Date, "now").mockReturnValue(NOW);
@@ -50,6 +53,8 @@ afterEach(() => {
   else process.env.CI = previousCi;
   if (previousOptOut === undefined) delete process.env.SKI_NO_UPDATE_NOTIFIER;
   else process.env.SKI_NO_UPDATE_NOTIFIER = previousOptOut;
+  if (previousGlobalOptOut === undefined) delete process.env.NO_UPDATE_NOTIFIER;
+  else process.env.NO_UPDATE_NOTIFIER = previousGlobalOptOut;
   if (ttyDescriptor === undefined) Reflect.deleteProperty(process.stdout, "isTTY");
   else Object.defineProperty(process.stdout, "isTTY", ttyDescriptor);
   mock.restore();
@@ -113,6 +118,13 @@ test.each([
     "the environment opt-out",
     () => {
       process.env.SKI_NO_UPDATE_NOTIFIER = "1";
+      return startUpdateCheck("1.1.0", false);
+    },
+  ],
+  [
+    "the shared environment opt-out",
+    () => {
+      process.env.NO_UPDATE_NOTIFIER = "1";
       return startUpdateCheck("1.1.0", false);
     },
   ],

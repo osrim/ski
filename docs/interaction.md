@@ -80,6 +80,12 @@ No-op messages are `Nothing selected.` or `Nothing to add|copy|install|update.`
 
 Color is off for non-TTY stdout and `TERM=dumb`. `NO_COLOR` disables it. `FORCE_COLOR` enables it.
 
+## Update notice
+
+The CLI checks the registry for a newer version at most once a day and prints the notice after the command output.
+
+The check makes no request when stdout is not a TTY, when `--json` is set, when the CLI runs from a git checkout, or when `CI`, `NO_UPDATE_NOTIFIER`, or `SKI_NO_UPDATE_NOTIFIER` is set.
+
 ## Tables and spinners
 
 Tables have no borders. Group rows by source and indent skill rows by two spaces. Measure rendered width with `Bun.stringWidth`.
