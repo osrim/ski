@@ -1,0 +1,101 @@
+# Terminal output reference
+
+This page defines CLI prompts and output.
+
+## Streams
+
+Human output uses a Clack frame on stdout. Runtime warnings and errors use stderr.
+
+Security findings stay on stdout because they are part of the review. `list --json` writes only JSON to stdout.
+
+## Prompts
+
+| prompt | non-interactive input |
+| --- | --- |
+| Skill selection | Pass names or `--all`. |
+| Scope or agents | Use flags or defaults. |
+| Write confirmation | Pass `--yes`. |
+| Critical finding approval | Run interactively. |
+| Warn finding review | Continue, or skip the prompt with `--yes`. |
+
+`--all` selects skills. It never confirms a write. `--yes` never approves critical findings.
+
+`install` treats restore confirmation differently. Without a terminal it preserves edits and installs other rows. `--yes` allows restore.
+
+Ctrl-C exits `130`. Completed writes remain completed.
+
+## Defaults
+
+Project scope is the default. The smallest detected agent set is the default target.
+
+```text
+Using project scope. Use -g for global.
+Linking to claude.
+```
+
+`ski` saves explicit scope and agent choices in `~/.ski/config.json`. A broken preference is ignored.
+
+Saved scope and agent targets preselect the next prompt. A new choice in the prompt or an explicit
+flag replaces the saved value.
+
+## Security review
+
+`add` and content-changing `update` show every file and finding before writing.
+
+- `critical` needs explicit approval.
+- `warn` pauses once per skill unless `--yes` is set.
+- `info` never pauses.
+
+`install` scans fetched content without a prompt. It skips a skill with a critical finding and prints the findings after the result lines.
+
+Each skill gets at most one review question.
+
+## Result lines
+
+Use `name: result` for one skill:
+
+```text
+grilling: installed @ v1.2.0
+grilling: restored @ v1.2.0
+grilling: source no longer has skills/grilling, skipped
+```
+
+Use the skill name once. Put a remedy on the next line when needed. Do not print stack traces.
+
+A failed skill does not stop the batch. The command continues, writes state that matches disk, and exits `1`.
+
+No-op messages are `Nothing selected.` or `Nothing to add|copy|install|update.`
+
+## Color
+
+| style | meaning |
+| --- | --- |
+| cyan | skill name |
+| bold | heading |
+| dim | secondary text or missing state |
+| green | success |
+| orange | needs attention |
+| red | failure or critical finding |
+| blue | information |
+
+Color is off for non-TTY stdout and `TERM=dumb`. `NO_COLOR` disables it. `FORCE_COLOR` enables it.
+
+## Tables and spinners
+
+Tables have no borders. Group rows by source and indent skill rows by two spaces. Measure rendered width with `Bun.stringWidth`.
+
+One spinner covers one wait. Its final line states the result. Spinners do not nest.
+
+## JSON
+
+Only `list` supports JSON:
+
+```json
+{
+  "scope": "project",
+  "lockfile": "/work/repo/ski-lock.json",
+  "skills": []
+}
+```
+
+The payload reports local state only.

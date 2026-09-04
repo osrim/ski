@@ -1,0 +1,5 @@
+{
+	"name": "ski",
+	"private": true,
+	"workspaces": ["cli"]
+}
