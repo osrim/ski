@@ -85,7 +85,6 @@ install
   -> core/install/apply.ts
   -> core/install/store.ts
   -> core/source/ (if the locked store entry needs restoration)
-  -> core/scan/index.ts + ui/gate.ts (stopsOn)
   -> core/install/{store,link}.ts
 
 update
@@ -150,20 +149,18 @@ changing it.
 
 `core/install/apply.ts` materializes a store entry, copies it to the canonical
 `.ski/skills/<name>` directory for the scope, and creates each requested relative link or
-copy. In project scope the canonical copy sits beside a `.ski/.gitignore` that hides it. The store is a cache: a link row installs without the network when the store holds
-its integrity, and every installed skill keeps working without the store. Its optional
-`scan` hook receives the files it is about to install, whether they were fetched or reused
-from the store, and a throw stops the install before any write. It
-records the installed skill in memory only when the caller supplies a lockfile.
-`add` and `update` supply one. `install` does not. `remove` deletes the selected rows in
-its `land` callback.
+copy. In project scope the canonical copy sits beside a `.ski/.gitignore` that hides it. The
+store is a cache: a link row installs without the network when the store holds its integrity,
+and every installed skill keeps working without the store. It records the installed skill in
+memory only when the caller supplies a lockfile. `add` and `update` supply one. `install` does
+not. `remove` deletes the selected rows in its `land` callback.
 
 New or changed files pass through `ui/gate.ts`. The gate lists files, runs the scan, shows
-findings, and returns `pass`, `declined`, or `blocked`. `install` prompts for nothing, so it
-scans through the `apply` hook instead and reuses only the gate's `stopsOn` rule: a critical
-finding skips the row, warn findings print after the result lines. `add` can install mentioned
-dependencies after review. `update` reports missing dependencies without installing
-them. A moved revision with unchanged skill files does not need another review.
+findings, and returns `pass`, `declined`, or `blocked`. `install` never reaches the gate: every
+lockfile row records content that already passed it, and the integrity check proves the files
+still match. `add` can install mentioned dependencies after review. `update` reports missing
+dependencies without installing them. A moved revision with unchanged skill files does not
+need another review.
 
 ## Module rules
 

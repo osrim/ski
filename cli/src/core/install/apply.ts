@@ -15,7 +15,6 @@ interface ApplyPlan {
   revision: Revision;
   integrity?: string;
   files: () => Promise<SkillFile[]>;
-  scan?: (files: SkillFile[]) => void;
 }
 
 export interface ApplyTarget {
@@ -37,12 +36,10 @@ const ensureStoreEntry = async (
     const entry = storeEntryPath(plan.source, plan.name, plan.integrity);
     if (existsSync(entry) && (await entryMatches(entry, plan.integrity))) {
       const files = await readDirFiles(entry);
-      plan.scan?.(files);
       return { entry, integrity: plan.integrity, restored: false, files };
     }
   }
   const files = await plan.files();
-  plan.scan?.(files);
   return { ...(await materialize(plan.source, plan.name, files, plan.integrity)), files };
 };
 

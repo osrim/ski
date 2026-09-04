@@ -3,16 +3,14 @@ import { applySkill } from "../core/install/apply.ts";
 import { assertSkillsDirSafe } from "../core/install/link.ts";
 import { readLock } from "../core/install/lockfile.ts";
 import { installedSkills, installPlacement, modifiedSkills } from "../core/install/placement.ts";
-import { CRITICAL_EXIT, runScanners, type Finding } from "../core/scan/index.ts";
 import { shortId } from "../core/source/revision.ts";
 import { resolveScope, type ScopeOptions } from "../core/install/scope.ts";
 import { sourceFor } from "../core/source/index.ts";
 import { IntegrityError } from "../core/install/store.ts";
 import { land } from "../ui/flow.ts";
-import { stopsOn } from "../ui/gate.ts";
 import type { CommandHelp } from "../ui/help.ts";
 import { fail, isInteractive, unwrap } from "../ui/prompt.ts";
-import { logError, logFindings, logSkillError } from "../ui/report.ts";
+import { logError, logSkillError } from "../ui/report.ts";
 import { reportModified } from "../ui/status.ts";
 import { skillName } from "../ui/style.ts";
 import { chooseAgents, warnScopeCollisions } from "../ui/target.ts";
@@ -59,7 +57,6 @@ export const run = async (options: InstallOptions): Promise<void> => {
     );
   }
 
-  const scanned: { name: string; findings: Finding[] }[] = [];
   const installed = await land({
     items: skills,
     name: ({ name }) => name,
@@ -80,14 +77,6 @@ export const run = async (options: InstallOptions): Promise<void> => {
           revision: entry,
           integrity: entry.integrity,
           files: () => source.fetchFiles(entry.commit, entry.path),
-          scan: (files) => {
-            const findings = runScanners({ name, files });
-            if (findings.length > 0) scanned.push({ name, findings });
-            if (stopsOn(findings, true)) {
-              process.exitCode = CRITICAL_EXIT;
-              throw new Error("critical findings, skipped\nRun `ski add` to review them.");
-            }
-          },
         },
         target,
       );
@@ -109,7 +98,6 @@ export const run = async (options: InstallOptions): Promise<void> => {
     scope,
     lock: null,
   });
-  for (const { name, findings } of scanned) logFindings(name, findings);
   p.outro(`Installed ${installed}/${skills.length} skill(s) (${scope}: ${agents.join(", ")}).`);
 };
 

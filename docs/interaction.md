@@ -46,7 +46,7 @@ flag replaces the saved value.
 - `warn` pauses once per skill unless `--yes` is set.
 - `info` never pauses.
 
-`install` scans fetched content without a prompt. It skips a skill with a critical finding and prints the findings after the result lines.
+`install` does not review anything. Every lockfile row was reviewed at `add` or `update` time, and the integrity check proves the content still matches. A row that fails the check is skipped with an error.
 
 Each skill gets at most one review question.
 

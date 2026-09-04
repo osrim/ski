@@ -1,6 +1,6 @@
 # ski 🎿
 
-`ski` installs, updates, and links skills from Git or local directories straight into your favorite coding agent. It runs a security scan on every file before installation, and uses a `ski-lock.json` file to ensure everyone on your team runs the exact same reviewed code.
+`ski` installs, updates, and links skills from Git or local directories straight into your favorite coding agent. It runs a security scan on every file and uses a `ski-lock.json` file to ensure everyone on your team runs the exact same reviewed code.
 
 ## Get started
 

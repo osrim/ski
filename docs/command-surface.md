@@ -47,7 +47,7 @@ ski install [-g|-p] [-y] [--agent <id>]
 
 It verifies file integrity before writing. Modified skills need confirmation because restore discards edits. Without a terminal, modified skills are skipped unless `--yes` is set.
 
-Every restored file is scanned, whether it was fetched or reused from the store. A row with a critical finding is skipped and the command exits `3`. `--yes` never approves critical findings. Warn findings are printed and do not stop the install.
+`install` does not scan. Every row records content that `add` or `update` already reviewed, and the integrity check proves the files still match. A row whose content does not match the recorded integrity is skipped and the command exits `1`.
 
 Copy rows use the agents recorded in the row. Link rows use `--agent` or the selected defaults.
 
@@ -109,5 +109,5 @@ ski list [-g|-p] [--json]
 | `0` | Success or no work. |
 | `1` | Operation failed. |
 | `2` | Invalid usage or missing prompt input. |
-| `3` | Critical findings blocked a skill. |
+| `3` | Critical findings blocked a skill in `add` or `update`. |
 | `130` | Cancelled. |
