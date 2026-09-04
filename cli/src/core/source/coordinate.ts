@@ -1,5 +1,6 @@
 import { isAbsolute, resolve as resolvePath } from "node:path";
 import { userHome } from "../paths.ts";
+import { usageError } from "../usage.ts";
 
 export type SourceKind = "git" | "local";
 
@@ -11,7 +12,10 @@ export interface Coordinate {
   tree?: string[];
 }
 
-const GITHUB_SHORTHAND = /^[\w.-]+\/[\w.-]+$/u;
+const GITHUB_SHORTHAND = /^[\w.-]+\/[\w.-]+(?:\/[\w.-]+)*$/u;
+
+const HASH_REJECTED =
+  "# is not a skill separator.\nPut the skill in the path: owner/repo/tdd@v1.2.0 or ./repo/tdd.";
 
 const LOCAL_PATH = /^(~|\.{1,2})?\//u;
 
@@ -124,63 +128,47 @@ const localPath = (raw: string): string => {
 export const parseCoordinate = (raw: string): Coordinate => {
   const input = raw.trim();
   if (!input) throw new Error("empty coordinate");
+  if (input.includes("#")) throw usageError(HASH_REJECTED);
 
-  let repoPart = input;
-  let skill: string | undefined;
-  let ref: string | undefined;
-
-  const skillSeparator = input.indexOf("#");
-  if (skillSeparator >= 0) {
-    repoPart = input.slice(0, skillSeparator);
-    const skillPart = input.slice(skillSeparator + 1);
-    const split = splitRef(skillPart);
-    skill = split.base;
-    ref = split.ref;
-    if (!skill) throw new Error(`invalid coordinate "${raw}": empty skill after #`);
-  }
-
-  const split = splitRef(repoPart);
-  repoPart = split.base;
-  ref ??= split.ref;
+  const { base, ref } = splitRef(input);
   if (ref === "") throw new Error(`invalid coordinate "${raw}": empty ref after @`);
+  if (!base) throw new Error(`invalid coordinate "${raw}": no repo`);
 
-  if (!repoPart) throw new Error(`invalid coordinate "${raw}": no repo`);
-
-  if (isLocalPath(repoPart)) {
+  if (isLocalPath(base)) {
     if (ref !== undefined) {
       throw new Error(
-        `Local paths cannot use @ref.\nUse Git instead: ski add file://${localPath(repoPart)}@${ref}`,
+        `Local paths cannot use @ref.\nUse Git instead: ski add file://${localPath(base)}@${ref}`,
       );
     }
-    return {
-      repo: localPath(repoPart),
-      kind: "local",
-      ...(skill !== undefined ? { skill } : {}),
-    };
+    return { repo: localPath(base), kind: "local" };
   }
 
-  assertSafeUrl(repoPart);
+  assertSafeUrl(base);
 
-  const web = /^https?:\/\//u.test(repoPart) ? parseWebUrl(repoPart) : null;
+  const web = /^https?:\/\//u.test(base) ? parseWebUrl(base) : null;
   if (web) {
     const chosen = ref ?? web.ref;
     return {
       repo: web.repo,
       kind: "git",
-      ...(skill !== undefined ? { skill } : {}),
       ...(chosen !== undefined ? { ref: chosen } : {}),
       ...(web.tree !== undefined ? { tree: web.tree } : {}),
     };
   }
 
-  const repo = GITHUB_SHORTHAND.test(repoPart) ? `https://github.com/${repoPart}` : repoPart;
-  if (repo !== repoPart || /^(https?:\/\/|git@|ssh:\/\/|file:\/\/)/u.test(repoPart)) {
+  if (GITHUB_SHORTHAND.test(base)) {
+    const [owner, repo, ...rest] = base.split("/");
+    const skill = rest.join("/");
     return {
-      repo,
+      repo: `https://github.com/${owner}/${repo}`,
       kind: "git",
-      ...(skill !== undefined ? { skill } : {}),
+      ...(skill ? { skill } : {}),
       ...(ref !== undefined ? { ref } : {}),
     };
+  }
+
+  if (/^(https?:\/\/|git@|ssh:\/\/|file:\/\/)/u.test(base)) {
+    return { repo: base, kind: "git", ...(ref !== undefined ? { ref } : {}) };
   }
   throw new Error(`Invalid coordinate "${raw}". Use owner/repo, a Git URL, or a local path.`);
 };

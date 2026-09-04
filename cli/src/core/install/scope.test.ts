@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { resolveScope, scopeFlag, USAGE_ERROR } from "./scope.ts";
+import { USAGE_ERROR } from "../usage.ts";
+import { resolveScope, scopeFlag } from "./scope.ts";
 
 const noWarn = (): void => {};
 

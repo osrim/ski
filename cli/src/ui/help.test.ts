@@ -22,7 +22,7 @@ test("coordinate lands between description and options", () => {
   const sections = commandSections();
   applyCommandHelp(sections, {
     description: "Fetch a repo's skills.",
-    coordinate: "owner/repo[#skill][@ref]",
+    coordinate: "owner/repo[/path/to/skill][@ref]",
     examples: ["$ ski add x/y"],
   });
   expect(titles(sections)).toEqual([

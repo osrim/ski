@@ -20,9 +20,14 @@ Global options are `-h/--help` and `-v/--version`.
 ski add <coordinate> [...skills] [-g|-p] [-a] [-y] [--agent <id>] [--copy]
 ```
 
-Accepted coordinates are `owner/repo[#skill][@ref]`, Git URLs, forge URLs, and local paths.
+Accepted coordinates are `owner/repo[/path/to/skill][@ref]`, Git URLs, forge URLs, and local paths.
 HTTP URLs are rejected; use `https`. A URL that carries a username or password is rejected.
+`#` is rejected with exit `2`.
 
+- `owner/repo` expands to GitHub. Every other forge needs a full URL.
+- Segments after `owner/repo` name one skill: its path in the source, else a skill whose
+  name is the last segment. A Git URL path is the repo, so name the skill as a positional
+  argument instead.
 - An explicit `@ref` pins the skill.
 - Without names, `add` opens a picker. A one-skill source skips the picker.
 - Named skills must exist and have distinct names.

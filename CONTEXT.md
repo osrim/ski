@@ -8,7 +8,7 @@ Use these terms in code, docs, and output.
 
 | term | meaning | avoid |
 | --- | --- | --- |
-| coordinate | User input in the form `owner/repo[#skill][@ref]`, a Git URL, or a local path. | spec, locator, target |
+| coordinate | User input in the form `owner/repo[/path/to/skill][@ref]` for GitHub, a Git URL, or a local path. | spec, locator, target |
 | source | Git repository or local directory that holds a skill. | repo, substrate |
 | source kind | `git` or `local`. | type |
 | revision | Resolved source state and its tracking mode. Git sources include a commit. | version, ref, pin |

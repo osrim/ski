@@ -21,6 +21,7 @@ import {
   type Source,
 } from "../core/source/index.ts";
 import { parseCoordinate, type Coordinate } from "../core/source/coordinate.ts";
+import { USAGE_ERROR } from "../core/usage.ts";
 import { resolveDeps, type DepsContext } from "../ui/deps.ts";
 import { confirm, fetchSkillFiles, land, type SkillFiles } from "../ui/flow.ts";
 import { reviewSkills } from "../ui/gate.ts";
@@ -41,7 +42,8 @@ export const help: CommandHelp = {
   description: "Fetch, review, and add skills. Use --copy to write directories instead of links.",
   coordinate: [
     "owner/repo                        GitHub repository",
-    "owner/repo#pdf                    named skill",
+    "owner/repo/pdf                    named skill",
+    "owner/repo/skills/pdf             skill path",
     "owner/repo@v1.2.0                 pinned ref",
     "https://github.com/o/r/tree/main  forge URL",
     "git@github.com:owner/repo.git     clone URL",
@@ -49,9 +51,9 @@ export const help: CommandHelp = {
   ].join("\n"),
   examples: [
     "$ ski add anthropics/skills",
-    "$ ski add anthropics/skills#pdf -g",
+    "$ ski add anthropics/skills/pdf -g",
     "$ ski add owner/repo@v1.2.0 --all -y",
-    "$ ski add owner/repo#pdf --copy",
+    "$ ski add owner/repo/pdf --copy",
   ],
 };
 
@@ -166,6 +168,7 @@ const parseCoordinateOrFail = (raw: string): Coordinate => {
   try {
     return parseCoordinate(raw);
   } catch (e) {
+    if ((e as Error).name === USAGE_ERROR) throw e;
     return fail((e as Error).message);
   }
 };

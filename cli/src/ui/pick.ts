@@ -1,4 +1,5 @@
 import * as p from "@clack/prompts";
+import { basename } from "node:path";
 import type { AgentId } from "../core/install/agents.ts";
 import { selector, type DiscoveredSkill } from "../core/source/discover.ts";
 import { occupiedAgents } from "../core/install/link.ts";
@@ -15,7 +16,7 @@ import { fail, requireTTY, unwrap, withSpinner } from "./prompt.ts";
 import { describeOutdated, friendlySource, groupLabel } from "./status.ts";
 import { green, skillName, softOrange, summarize, unstruck } from "./style.ts";
 
-const COORDINATE_REMEDY = "Pass skill names, #skill, or --all.";
+const COORDINATE_REMEDY = "Pass skill names, owner/repo/skill, or --all.";
 const SELECTION_REMEDY = "Pass skill names or --all.";
 
 interface SelectOption {
@@ -36,16 +37,24 @@ const groupOptionsBySource = <T>(
   return groups;
 };
 
-const matches = (skill: DiscoveredSkill, given: string): boolean =>
-  skill.path === given || (!skill.ambiguous && skill.name === given);
+const matching = (skills: DiscoveredSkill[], given: string): DiscoveredSkill[] => {
+  const byPath = skills.filter((skill) => skill.path === given);
+  if (byPath.length > 0) return byPath;
+  const name = basename(given);
+  return skills.filter((skill) => !skill.ambiguous && skill.name === name);
+};
 
 const requireKnown = (source: string, names: string[], skills: DiscoveredSkill[]): void => {
-  const unknown = names.filter((name) => !skills.some((skill) => matches(skill, name)));
+  const unknown = names.filter((name) => matching(skills, name).length === 0);
   if (unknown.length === 0) return;
 
-  const shared = unknown.filter((name) =>
-    skills.some((skill) => skill.ambiguous && skill.name === name),
-  );
+  const shared = [
+    ...new Set(
+      unknown
+        .map((name) => basename(name))
+        .filter((name) => skills.some((skill) => skill.ambiguous && skill.name === name)),
+    ),
+  ];
   if (shared.length > 0) {
     const paths = skills
       .filter((skill) => skill.ambiguous && shared.includes(skill.name))
@@ -250,7 +259,7 @@ export const pickSkillsToAdd = async (selection: AddSelection): Promise<Picked> 
 
   if (names.length > 0) {
     requireKnown(source.id, names, skills);
-    const requested = skills.filter((skill) => names.some((name) => matches(skill, name)));
+    const requested = [...new Set(names.flatMap((name) => matching(skills, name)))];
     requireDistinct(requested);
     for (const skill of requested) {
       const why = held(skill);

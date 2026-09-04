@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { cac, type CAC } from "cac";
-import { USAGE_ERROR } from "./core/install/scope.ts";
+import { USAGE_ERROR } from "./core/usage.ts";
 import { nearest } from "./core/suggest.ts";
 import { startUpdateCheck } from "./core/update-check.ts";
 import { applyCommandHelp, applyRootHelp, type CommandHelp } from "./ui/help.ts";

@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { resolve } from "node:path";
+import { USAGE_ERROR } from "../usage.ts";
 import { parseCoordinate, repoName } from "./coordinate.ts";
 
 test("owner/repo shorthand expands to a GitHub URL", () => {
@@ -9,11 +10,33 @@ test("owner/repo shorthand expands to a GitHub URL", () => {
   });
 });
 
-test("#skill and @ref suffixes parse in either order", () => {
-  expect(parseCoordinate("owner/repo#pdf")).toMatchObject({ skill: "pdf" });
+test("segments past the repo are the skill, and @ref pins it", () => {
+  expect(parseCoordinate("owner/repo/pdf")).toEqual({
+    repo: "https://github.com/owner/repo",
+    kind: "git",
+    skill: "pdf",
+  });
+  expect(parseCoordinate("owner/repo/skills/tdd")).toMatchObject({ skill: "skills/tdd" });
   expect(parseCoordinate("owner/repo@v1.2.0")).toMatchObject({ ref: "v1.2.0" });
-  expect(parseCoordinate("owner/repo#pdf@main")).toMatchObject({ skill: "pdf", ref: "main" });
-  expect(parseCoordinate("owner/repo@main#pdf")).toMatchObject({ skill: "pdf", ref: "main" });
+  expect(parseCoordinate("owner/repo/tdd@v1.2.0")).toMatchObject({
+    repo: "https://github.com/owner/repo",
+    skill: "tdd",
+    ref: "v1.2.0",
+  });
+});
+
+test("# is refused as a usage error naming the path form", () => {
+  for (const raw of ["owner/repo#pdf", "owner/repo@main#pdf", "o/r#", "./skill#a@v1"]) {
+    expect(() => parseCoordinate(raw)).toThrow(
+      "Put the skill in the path: owner/repo/tdd@v1.2.0 or ./repo/tdd.",
+    );
+  }
+  try {
+    parseCoordinate("owner/repo#pdf");
+    expect.unreachable();
+  } catch (e) {
+    expect((e as Error).name).toBe(USAGE_ERROR);
+  }
 });
 
 test("full URLs pass through with suffixes", () => {
@@ -36,10 +59,9 @@ test("local paths resolve to absolute local sources", () => {
     repo: resolve("./fixtures/repo"),
     kind: "local",
   });
-  expect(parseCoordinate("/tmp/some/repo#a")).toMatchObject({
-    repo: "/tmp/some/repo",
+  expect(parseCoordinate("/tmp/some/repo/skills/a")).toEqual({
+    repo: "/tmp/some/repo/skills/a",
     kind: "local",
-    skill: "a",
   });
   expect(parseCoordinate("file:///tmp/x@v1")).toMatchObject({
     repo: "file:///tmp/x",
@@ -69,14 +91,12 @@ test("a single-segment relative path is not a GitHub shorthand", () => {
 
 test("a local path cannot carry a ref", () => {
   expect(() => parseCoordinate("./skill@v1")).toThrow("Local paths cannot use @ref");
-  expect(() => parseCoordinate("./skill#a@v1")).toThrow("Local paths cannot use @ref");
 });
 
 test("garbage is rejected", () => {
   expect(() => parseCoordinate("")).toThrow("empty");
   expect(() => parseCoordinate("justaname")).toThrow("Invalid coordinate");
   expect(() => parseCoordinate("o/r@")).toThrow("empty ref");
-  expect(() => parseCoordinate("o/r#")).toThrow("empty skill");
 });
 
 test("repoName strips .git and trailing slashes", () => {
@@ -164,10 +184,6 @@ test("a URL with no browser path is left alone as a clone URL", () => {
 test("an explicit @ref wins over the ref the page showed", () => {
   expect(parseCoordinate("https://github.com/o/r/tree/main/x@v2")).toMatchObject({
     ref: "v2",
-    tree: ["main", "x"],
-  });
-  expect(parseCoordinate("https://github.com/o/r/tree/main/x#tdd")).toMatchObject({
-    skill: "tdd",
     tree: ["main", "x"],
   });
 });

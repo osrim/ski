@@ -34,13 +34,15 @@ ski install
 
 ## Add a skill
 
-Pass `owner/repo`, a Git or forge URL, or a local directory. Add a skill name when the source contains more than one skill.
+Pass `owner/repo`, a Git or forge URL, or a local directory. `owner/repo` always means GitHub. For any other forge, pass the full URL.
 
 ```sh
 ski add owner/repo
 ski add owner/repo tdd
-ski add owner/repo#tdd@v1.2.0
+ski add owner/repo/tdd
+ski add owner/repo/skills/tdd@v1.2.0
 ski add owner/repo --all
+ski add https://gitlab.com/group/repo tdd
 ski add ./skills/my-skill
 ```
 

@@ -162,6 +162,64 @@ describe("pickSkillsToAdd", () => {
     expect(same).toEqual({ skills: [], extend: [], asked: false });
   });
 
+  test("a skill path resolves by its last segment when no path matches", async () => {
+    const picked = await pickSkillsToAdd({
+      skills: [only],
+      names: ["skills/adhd"],
+      lock: emptyLock(),
+      scope: "global",
+      agents: ["claude"],
+      source: upstream,
+      rev,
+      options: { copy: false },
+    });
+    expect(picked).toEqual({ skills: [only], extend: [], asked: false });
+  });
+
+  test("an exact path wins over another skill whose name is the last segment", async () => {
+    const renamed = skill({ name: "docs", path: "skills/tdd" });
+    const picked = await pickSkillsToAdd({
+      skills: [renamed, skill({ name: "tdd", path: "other/tdd" })],
+      names: ["skills/tdd"],
+      lock: emptyLock(),
+      scope: "global",
+      agents: ["claude"],
+      source: upstream,
+      rev,
+      options: { copy: false },
+    });
+    expect(picked).toEqual({ skills: [renamed], extend: [], asked: false });
+  });
+
+  test("a path matching neither a path nor a last-segment name stops the run", async () => {
+    const exit = spyOn(process, "exit").mockImplementation(() => {
+      throw new Error("exit");
+    });
+    const written: string[] = [];
+    const stderr = spyOn(process.stderr, "write").mockImplementation(((chunk: unknown) => {
+      written.push(String(chunk));
+      return true;
+    }) as typeof process.stderr.write);
+    try {
+      await expect(
+        pickSkillsToAdd({
+          skills: [only],
+          names: ["skills/nope"],
+          lock: emptyLock(),
+          scope: "global",
+          agents: ["claude"],
+          source: upstream,
+          rev,
+          options: { copy: false },
+        }),
+      ).rejects.toThrow("exit");
+      expect(written.join("")).toInclude("has no skill called skills/nope");
+    } finally {
+      exit.mockRestore();
+      stderr.mockRestore();
+    }
+  });
+
   test("changed upstream bytes return an installed skill for review", async () => {
     const lock = emptyLock();
     const changed = skill({ name: "changed", path: "changed" });
