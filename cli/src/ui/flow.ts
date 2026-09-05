@@ -1,12 +1,11 @@
 import * as p from "@clack/prompts";
-import type { Backup } from "../core/install/apply.ts";
 import type { DiscoveredSkill } from "../core/source/discover.ts";
 import type { Source } from "../core/source/index.ts";
 import type { SkillFile } from "../core/skill/files.ts";
 import { writeLock, type Lockfile } from "../core/install/lockfile.ts";
 import type { Scope } from "../core/paths.ts";
 import { failNoTTY, isInteractive, unwrap, withSpinner } from "./prompt.ts";
-import { logSkillError, warnBackups } from "./report.ts";
+import { logSkillError } from "./report.ts";
 import { warnRestored } from "./status.ts";
 import { skillName } from "./style.ts";
 import { hideLinksFromGit } from "./target.ts";
@@ -60,7 +59,6 @@ interface Landing<T> {
 
 interface LandingResult {
   success: string;
-  backedUp?: Backup[];
   restored?: boolean;
 }
 
@@ -87,7 +85,6 @@ export const land = async <T>({
           )
         : await apply(item);
       if (result.restored) warnRestored(name(item));
-      warnBackups(name(item), result.backedUp ?? []);
       if (!message) p.log.success(`${skillName(name(item))}: ${result.success}`);
       applied++;
     } catch (e) {

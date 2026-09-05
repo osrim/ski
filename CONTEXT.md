@@ -43,7 +43,6 @@ Use these terms in code, docs, and output.
 | canonical copy | Real skill directory in `.ski/skills` that links point to. One per scope. `ski` owns it while a link row names it. | master copy, primary |
 | link | Relative symlink from an agent's skills directory to the canonical copy. | shortcut, alias, pointer |
 | copy | Real skill directory written with `add --copy`. | clone, download |
-| backup | Entry moved aside before `ski` writes the same name. | copy, archive |
 | managed | Link or copy created by `ski`. | owned, tracked |
 | installed | Recorded in the lockfile and present as a link or copy. | added, present, tracked |
 | placement | An installed skill's scope, agents, and form (link or copy). | target, location |

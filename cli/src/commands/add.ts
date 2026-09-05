@@ -1,5 +1,5 @@
 import * as p from "@clack/prompts";
-import { applySkill, type Backup } from "../core/install/apply.ts";
+import { applySkill } from "../core/install/apply.ts";
 import { assertSkillsDirSafe } from "../core/install/link.ts";
 import { addPlacement } from "../core/install/placement.ts";
 import type { DiscoveredSkill } from "../core/source/discover.ts";
@@ -258,8 +258,8 @@ const addSkill = async (
   skill: DiscoveredSkill,
   files: SkillFile[],
   dest: Destination,
-): Promise<{ backedUp: Backup[]; integrity: string; restored: boolean; success: string }> => {
-  const { backedUp, integrity, restored } = await applySkill(
+): Promise<{ integrity: string; restored: boolean; success: string }> => {
+  const { integrity, restored } = await applySkill(
     {
       name: skill.name,
       source: dest.source.id,
@@ -270,15 +270,15 @@ const addSkill = async (
     addPlacement(dest.lock.skills[skill.name], dest),
   );
   const label = shownLabel(dest.ref, { ...dest.rev, integrity });
-  return { backedUp, restored, integrity, success: `${dest.mode.landed} @ ${label}` };
+  return { restored, integrity, success: `${dest.mode.landed} @ ${label}` };
 };
 
 const extendSkill = async (
   { skill, agents }: Extension,
   dest: Destination,
-): Promise<{ backedUp: Backup[]; integrity: string; restored: boolean; success: string }> => {
+): Promise<{ integrity: string; restored: boolean; success: string }> => {
   const row = dest.lock.skills[skill.name]!;
-  const { backedUp, restored } = await applySkill(
+  const { restored } = await applySkill(
     {
       name: skill.name,
       source: dest.source.id,
@@ -291,7 +291,6 @@ const extendSkill = async (
   );
   const label = displayLabel(row);
   return {
-    backedUp,
     restored,
     integrity: row.integrity,
     success: `${dest.mode.extended} into ${agents.join(", ")} @ ${label}`,

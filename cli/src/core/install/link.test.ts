@@ -150,16 +150,16 @@ test("a rejected name or source writes nothing outside the store", () => {
 
 test("linkSkill writes a relative link to the canonical copy; relink is idempotent", async () => {
   await writeCanonical("demo", files, "global");
-  expect(await linkSkill("demo", "global", "claude")).toBeNull();
+  await linkSkill("demo", "global", "claude");
   const target = skillPath("demo", "global", "claude");
   expect((await lstat(target)).isSymbolicLink()).toBe(true);
   expect(await readlink(target)).toBe(join("..", "..", "ski-home", "skills", "demo"));
   expect(await realpath(target)).toBe(await realpath(canonicalPath("demo", "global")));
-  expect(await linkSkill("demo", "global", "claude")).toBeNull();
+  await linkSkill("demo", "global", "claude");
 });
 
 test("one canonical copy, one relative link per agent, universal included", async () => {
-  expect(await linkSkill("demo", "global", "universal")).toBeNull();
+  await linkSkill("demo", "global", "universal");
   await linkSkill("demo", "global", "opencode");
 
   expect((await lstat(canonicalPath("demo", "global"))).isDirectory()).toBe(true);
@@ -201,22 +201,21 @@ test("a link written through a symlinked agent dir still resolves", async () => 
   }
 });
 
-test("a real dir at the target is backed up, not clobbered", async () => {
+test("a real dir at the target is refused, not clobbered", async () => {
   const target = skillPath("mine", "global", "claude");
   await mkdir(target, { recursive: true });
   await writeFile(join(target, "SKILL.md"), "the user's own skill\n");
 
   await writeCanonical("mine", files, "global");
-  const backedUp = await linkSkill("mine", "global", "claude");
-
-  expect(backedUp).toBe(join(`${skillsDir("global", "claude")}.bak`, "mine"));
-  expect(await readFile(join(backedUp!, "SKILL.md"), "utf8")).toBe("the user's own skill\n");
-  expect(await readFile(join(target, "SKILL.md"), "utf8")).toBe("hello\n");
+  await expect(linkSkill("mine", "global", "claude")).rejects.toThrow(
+    "~/claude-home/skills/mine exists and is not managed by ski, skipped\nMove or delete it, then re-run.",
+  );
+  expect(await readFile(join(target, "SKILL.md"), "utf8")).toBe("the user's own skill\n");
 });
 
 test("copySkill writes a real dir, not a link, and linkedAgents does not claim it", async () => {
   const target = skillPath("copied", "global", "opencode");
-  expect(await copySkill("copied", files, "global", "opencode", false)).toBeNull();
+  await copySkill("copied", files, "global", "opencode", false);
 
   expect((await lstat(target)).isSymbolicLink()).toBe(false);
   expect(await readFile(join(target, "SKILL.md"), "utf8")).toBe("hello\n");
@@ -224,19 +223,17 @@ test("copySkill writes a real dir, not a link, and linkedAgents does not claim i
   expect(await linkedAgents("copied", "global")).toEqual([]);
 });
 
-test("copySkill backs up a foreign dir, replaces a managed one in place", async () => {
+test("copySkill refuses a foreign dir, replaces a managed one in place", async () => {
   const target = skillPath("copied", "global", "opencode");
   await writeFile(join(target, "notes.md"), "mine\n");
-  const backedUp = await copySkill("copied", files, "global", "opencode", false);
+  await expect(copySkill("copied", files, "global", "opencode", false)).rejects.toThrow(
+    "is not managed by ski, skipped",
+  );
+  expect(await readFile(join(target, "notes.md"), "utf8")).toBe("mine\n");
 
-  expect(backedUp).toBe(join(`${skillsDir("global", "opencode")}.bak`, "copied"));
-  expect(await readFile(join(backedUp!, "notes.md"), "utf8")).toBe("mine\n");
+  await copySkill("copied", files, "global", "opencode", true);
   expect(existsSync(join(target, "notes.md"))).toBe(false);
-
-  await writeFile(join(target, "notes.md"), "edited\n");
-  expect(await copySkill("copied", files, "global", "opencode", true)).toBeNull();
-  expect(existsSync(join(target, "notes.md"))).toBe(false);
-  expect(existsSync(join(`${skillsDir("global", "opencode")}.bak`, "copied.2"))).toBe(false);
+  expect(await readFile(join(target, "SKILL.md"), "utf8")).toBe("hello\n");
 });
 
 test("unlinkSkill removes links but refuses foreign dirs; removeCanonical drops the copy", async () => {
@@ -253,6 +250,21 @@ test("unlinkSkill removes links but refuses foreign dirs; removeCanonical drops 
   const target = skillPath("real", "global", "claude");
   await mkdir(target, { recursive: true });
   expect(unlinkSkill("real", "global", "claude")).rejects.toThrow("not managed by ski");
+});
+
+test("a refusal names a path inside the project relative to it", async () => {
+  const dir = join(tmp, "proj-refusal");
+  await mkdir(join(dir, ".claude", "skills", "tdd"), { recursive: true });
+  const prev = process.cwd();
+  process.chdir(dir);
+  try {
+    await writeCanonical("tdd", files, "project");
+    await expect(linkSkill("tdd", "project", "claude")).rejects.toThrow(
+      ".claude/skills/tdd exists and is not managed by ski, skipped\nMove or delete it, then re-run.",
+    );
+  } finally {
+    process.chdir(prev);
+  }
 });
 
 test("writeCanonical in project scope hides .ski from Git with its own .gitignore", async () => {
@@ -354,7 +366,7 @@ test("assertSkillsDirSafe leaves a global skills dir symlink alone", async () =>
   }
 });
 
-test("a symlink ski did not create is backed up, not clobbered", async () => {
+test("a symlink ski did not create is refused, not clobbered", async () => {
   const dir = skillsDir("global", "claude");
   await mkdir(dir, { recursive: true });
   const theirs = join(tmp, "their-skill");
@@ -363,16 +375,17 @@ test("a symlink ski did not create is backed up, not clobbered", async () => {
   await symlink(join(tmp, "never-existed"), join(dir, "dangling"));
 
   await writeCanonical("borrowed", files, "global");
-  expect(await linkSkill("borrowed", "global", "claude")).toBe(join(`${dir}.bak`, "borrowed"));
-  expect(await readlink(join(`${dir}.bak`, "borrowed"))).toBe(theirs);
-  expect(await realpath(join(dir, "borrowed"))).toBe(
-    await realpath(canonicalPath("borrowed", "global")),
+  await expect(linkSkill("borrowed", "global", "claude")).rejects.toThrow(
+    "is not managed by ski, skipped",
   );
+  expect(await readlink(join(dir, "borrowed"))).toBe(theirs);
 
   expect(occupiedAgents("dangling", "global")).toEqual(["claude"]);
   await writeCanonical("dangling", files, "global");
-  expect(await linkSkill("dangling", "global", "claude")).toBe(join(`${dir}.bak`, "dangling"));
-  expect(await readlink(join(`${dir}.bak`, "dangling"))).toBe(join(tmp, "never-existed"));
+  await expect(linkSkill("dangling", "global", "claude")).rejects.toThrow(
+    "is not managed by ski, skipped",
+  );
+  expect(await readlink(join(dir, "dangling"))).toBe(join(tmp, "never-existed"));
 });
 
 test("unlinkSkill refuses a symlink that does not point at the canonical dir", async () => {

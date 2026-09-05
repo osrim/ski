@@ -1,7 +1,7 @@
 import { Ansis } from "ansis";
 import cliTruncate from "cli-truncate";
 import { createSupportsColor } from "supports-color";
-import { userHome } from "../core/paths.ts";
+export { tildify } from "../core/paths.ts";
 
 // supports-color handles piped output and TERM=dumb. NO_COLOR needs an explicit check.
 const colorLevel = (): 0 | 1 | 2 | 3 => {
@@ -57,6 +57,3 @@ export const summarize = (text: string | undefined, width = 60): string | undefi
   text === undefined || text === ""
     ? undefined
     : cliTruncate(text.replace(/\s+/gu, " ").trim(), width, { preferTruncationOnSpace: true });
-
-export const tildify = (path: string): string =>
-  path.startsWith(userHome()) ? path.replace(userHome(), "~") : path;

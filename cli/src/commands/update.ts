@@ -1,5 +1,5 @@
 import * as p from "@clack/prompts";
-import { applySkill, type ApplyTarget, type Backup } from "../core/install/apply.ts";
+import { applySkill, type ApplyTarget } from "../core/install/apply.ts";
 import { readLock, type Lockfile } from "../core/install/lockfile.ts";
 import { canonicalPath } from "../core/install/link.ts";
 import {
@@ -173,7 +173,7 @@ const landUpdates = async (
 const recordBump = async (
   status: MovedVerdict,
   placementOf: PlacementOf,
-): Promise<{ backedUp: Backup[]; integrity: string; restored: boolean; success: string }> => {
+): Promise<{ integrity: string; restored: boolean; success: string }> => {
   const { skill } = status;
   const placement = await placementOf(skill);
   const result = await applySkill(
@@ -224,9 +224,9 @@ const previewAndReview = async (
 const applyUpdate = async (
   { status, files }: UpdatedFiles,
   placementOf: PlacementOf,
-): Promise<{ backedUp: Backup[]; restored: boolean; success: string }> => {
+): Promise<{ restored: boolean; success: string }> => {
   const { skill } = status;
-  const { backedUp, integrity, restored } = await applySkill(
+  const { integrity, restored } = await applySkill(
     {
       name: skill.name,
       source: skill.source,
@@ -239,7 +239,7 @@ const applyUpdate = async (
   const range =
     revisionRange(status) ||
     `${displayLabel(skill)} → ${displayLabel({ ...status.upstream, integrity })}`;
-  return { backedUp, restored, success: `updated ${range}` };
+  return { restored, success: `updated ${range}` };
 };
 
 const truncate = (diff: string): string => {

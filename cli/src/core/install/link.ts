@@ -1,10 +1,10 @@
-import { mkdir, rm, symlink, lstat, realpath, readlink, rename, writeFile } from "node:fs/promises";
+import { mkdir, rm, symlink, lstat, realpath, readlink, writeFile } from "node:fs/promises";
 import { existsSync, lstatSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { skillsDir, AGENTS, type AgentId } from "./agents.ts";
 import { writeFiles, type SkillFile } from "../skill/files.ts";
 import { integrityOfDir } from "../skill/integrity.ts";
-import { canonicalDir, childPath, dataDir, type Scope } from "../paths.ts";
+import { canonicalDir, childPath, dataDir, tildify, type Scope } from "../paths.ts";
 
 const isSymlinkPath = async (path: string): Promise<boolean> => {
   try {
@@ -15,20 +15,6 @@ const isSymlinkPath = async (path: string): Promise<boolean> => {
 };
 
 const present = (path: string): boolean => lstatSync(path, { throwIfNoEntry: false }) !== undefined;
-
-const freeBackupPath = (base: string): string => {
-  if (!present(base)) return base;
-  let n = 2;
-  while (present(`${base}.${n}`)) n++;
-  return `${base}.${n}`;
-};
-
-const backupTo = async (target: string, base: string): Promise<string> => {
-  await mkdir(dirname(base), { recursive: true });
-  const dest = freeBackupPath(base);
-  await rename(target, dest);
-  return dest;
-};
 
 // Resolves the deepest existing ancestor so a link into a not-yet-created directory still compares.
 const realpathOrNearest = async (path: string): Promise<string> => {
@@ -86,6 +72,23 @@ const isManagedLink = async (path: string, scope: Scope): Promise<boolean> => {
 const isForeignEntry = async (path: string, scope: Scope): Promise<boolean> =>
   present(path) && !(await isManagedLink(path, scope));
 
+const displayPath = (path: string): string => {
+  const rel = relative(process.cwd(), path);
+  return rel.startsWith("..") ? tildify(path) : rel;
+};
+
+export const assertNotForeign = async (
+  name: string,
+  scope: Scope,
+  agent: AgentId,
+): Promise<void> => {
+  const target = skillPath(name, scope, agent);
+  if (!(await isForeignEntry(target, scope))) return;
+  throw new Error(
+    `${displayPath(target)} exists and is not managed by ski, skipped\nMove or delete it, then re-run.`,
+  );
+};
+
 export const linkedAgents = async (name: string, scope: Scope): Promise<AgentId[]> => {
   const hits = await Promise.all(
     AGENTS.map(async (agent) =>
@@ -98,23 +101,16 @@ export const linkedAgents = async (name: string, scope: Scope): Promise<AgentId[
 export const occupiedAgents = (name: string, scope: Scope): AgentId[] =>
   AGENTS.filter((agent) => present(skillPath(name, scope, agent.id))).map((agent) => agent.id);
 
-export const linkSkill = async (
-  name: string,
-  scope: Scope,
-  agent: AgentId,
-): Promise<string | null> => {
+export const linkSkill = async (name: string, scope: Scope, agent: AgentId): Promise<void> => {
   const target = skillPath(name, scope, agent);
   const dir = dirname(target);
   await mkdir(dir, { recursive: true });
-  const backedUp = (await isForeignEntry(target, scope))
-    ? await backupTo(target, join(`${dir}.bak`, name))
-    : null;
+  await assertNotForeign(name, scope, agent);
   await rm(target, { force: true });
   // Resolve both ends so the link still holds when an agent dir is itself a symlink.
   const from = await realpathOrNearest(dir);
   const to = await realpathOrNearest(canonicalPath(name, scope));
   await symlink(relative(from, to), target);
-  return backedUp;
 };
 
 export const copySkill = async (
@@ -123,17 +119,12 @@ export const copySkill = async (
   scope: Scope,
   agent: AgentId,
   managed: boolean,
-): Promise<string | null> => {
+): Promise<void> => {
   const target = skillPath(name, scope, agent);
-  const dir = dirname(target);
-  await mkdir(dir, { recursive: true });
-  const backedUp =
-    !managed && (await isForeignEntry(target, scope))
-      ? await backupTo(target, join(`${dir}.bak`, name))
-      : null;
+  await mkdir(dirname(target), { recursive: true });
+  if (!managed) await assertNotForeign(name, scope, agent);
   await rm(target, { recursive: true, force: true });
   await writeFiles(target, files);
-  return backedUp;
 };
 
 export const removeCopy = (name: string, scope: Scope, agent: AgentId): Promise<void> =>
@@ -183,7 +174,7 @@ export const copyState = async (
 export const unlinkSkill = async (name: string, scope: Scope, agent: AgentId): Promise<void> => {
   const target = skillPath(name, scope, agent);
   if (await isForeignEntry(target, scope)) {
-    throw new Error(`${target} is not managed by ski. Delete it yourself.`);
+    throw new Error(`${displayPath(target)} is not managed by ski. Delete it yourself.`);
   }
   await rm(target, { recursive: true, force: true });
 };

@@ -69,7 +69,7 @@ export const run = async (options: InstallOptions): Promise<void> => {
       }
       const target = await installPlacement(entry, scope, agents);
       const source = sourceFor(entry.source);
-      const { backedUp, restored } = await applySkill(
+      const { restored } = await applySkill(
         {
           name,
           source: entry.source,
@@ -81,7 +81,6 @@ export const run = async (options: InstallOptions): Promise<void> => {
         target,
       );
       return {
-        backedUp,
         restored,
         success: `${restored || modified.has(name) ? "restored" : "installed"} @ ${shortId(entry)}`,
       };

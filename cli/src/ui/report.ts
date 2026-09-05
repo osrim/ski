@@ -1,9 +1,8 @@
 import * as p from "@clack/prompts";
 import prettyBytes from "pretty-bytes";
-import type { Backup } from "../core/install/apply.ts";
 import { isSymlink, type SkillFile } from "../core/skill/files.ts";
 import type { Finding, Severity } from "../core/scan/index.ts";
-import { blue, bold, dim, orange, pad, red, skillName, tildify } from "./style.ts";
+import { blue, bold, dim, orange, pad, red, skillName } from "./style.ts";
 
 const headline =
   (paint: (text: string) => string) =>
@@ -22,14 +21,6 @@ export const logSkillError = (name: string, cause: unknown): void =>
   logError(`${skillName(name)}: ${(cause as Error).message}`);
 
 export const warn = (message: string): void => p.log.warn(headline(orange)(message));
-
-export const warnBackups = (name: string, backups: Backup[]): void => {
-  for (const backup of backups) {
-    warn(
-      `${skillName(name)}: backed up the existing ${backup.agent} entry to ${tildify(backup.path)}`,
-    );
-  }
-};
 
 export const renderFiles = (files: SkillFile[]): string =>
   files

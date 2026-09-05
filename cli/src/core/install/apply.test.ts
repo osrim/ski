@@ -53,11 +53,10 @@ const linksTo = async (name: string, agent: AgentId): Promise<boolean> => {
 
 test("applySkill caches, writes the canonical copy, links relatively, and records the row", async () => {
   const lock = emptyLock();
-  const { backedUp } = await applySkill(
+  await applySkill(
     { name: "demo", source: "https://github.com/o/r", path: "skills/demo", revision, files: lazy },
     { scope: "global", agents: ["claude"], lock },
   );
-  expect(backedUp).toEqual([]);
   const entry = lock.skills["demo"]!;
   expect(entry.source).toBe("https://github.com/o/r");
   expect(entry.path).toBe("skills/demo");
@@ -116,14 +115,13 @@ test("an edited store entry is refetched and restored, and says so", async () =>
   );
 });
 
-test("a modified canonical copy is replaced in place, never backed up", async () => {
+test("a modified canonical copy is replaced in place", async () => {
   const plan = { name: "owned", source: "https://github.com/o/r", path: "", revision, files: lazy };
   await applySkill(plan, { scope: "global", agents: ["claude"] });
   await writeFile(join(canonicalPath("owned", "global"), "SKILL.md"), "edited\n");
   await writeFile(join(canonicalPath("owned", "global"), "notes.md"), "mine\n");
 
-  const { backedUp } = await applySkill(plan, { scope: "global", agents: ["claude"] });
-  expect(backedUp).toEqual([]);
+  await applySkill(plan, { scope: "global", agents: ["claude"] });
   expect(await readFile(join(canonicalPath("owned", "global"), "SKILL.md"), "utf8")).toBe(
     "hello\n",
   );
@@ -166,24 +164,30 @@ test("applySkill links every target agent to one canonical copy", async () => {
   expect(Object.keys(lock.skills)).toEqual(["multi"]);
 });
 
-test("backups are reported per agent dir", async () => {
+test("a foreign agent entry fails the skill and stays in place", async () => {
   const rev: Revision = { commit: "e".repeat(40), branch: "main", mode: "auto" };
   for (const agent of ["claude", "universal"] as const) {
     const target = skillPath("hand-written", "global", agent);
     await mkdir(target, { recursive: true });
   }
-  const { backedUp } = await applySkill(
-    {
-      name: "hand-written",
-      source: "https://github.com/o/r",
-      path: "",
-      revision: rev,
-      files: lazy,
-    },
-    { scope: "global", agents: ["claude", "opencode", "universal"] },
-  );
-  expect(backedUp.map((b) => b.agent)).toEqual(["claude", "universal"]);
-  expect(backedUp.every((b) => b.path.endsWith("hand-written"))).toBe(true);
+  await expect(
+    applySkill(
+      {
+        name: "hand-written",
+        source: "https://github.com/o/r",
+        path: "",
+        revision: rev,
+        files: lazy,
+      },
+      { scope: "global", agents: ["claude", "opencode", "universal"] },
+    ),
+  ).rejects.toThrow("exists and is not managed by ski, skipped");
+  for (const agent of ["claude", "universal"] as const) {
+    const target = skillPath("hand-written", "global", agent);
+    expect((await lstat(target)).isDirectory()).toBe(true);
+    expect(existsSync(join(target, "SKILL.md"))).toBe(false);
+  }
+  expect(existsSync(canonicalPath("hand-written", "global"))).toBe(false);
 });
 
 test("an unsafe agent dir is refused before the canonical copy is written", async () => {
@@ -228,11 +232,10 @@ test("applySkill enforces dest-safety on every path (the old update gap)", async
 test("the copy form writes a directory per agent, not a link, and records where", async () => {
   const lock = emptyLock();
   const rev: Revision = { commit: "f".repeat(40), branch: "main", mode: "auto" };
-  const { backedUp } = await applySkill(
+  await applySkill(
     { name: "copied", source: "https://github.com/o/r", path: "", revision: rev, files: lazy },
     { scope: "global", agents: ["claude", "opencode"], lock, copy: { managed: [] } },
   );
-  expect(backedUp).toEqual([]);
   for (const agent of ["claude", "opencode"] as const) {
     const target = skillPath("copied", "global", agent);
     expect((await lstat(target)).isSymbolicLink()).toBe(false);
@@ -250,7 +253,7 @@ test("the copy form writes a directory per agent, not a link, and records where"
   });
 });
 
-test("a copy replaces managed directories without a backup and backs up a foreign one", async () => {
+test("a copy replaces managed directories and refuses a foreign one", async () => {
   const other: SkillFile[] = [{ path: "SKILL.md", content: Buffer.from("v2\n"), mode: "100644" }];
   await writeFile(join(skillPath("copied", "global", "claude"), "SKILL.md"), "edited\n");
   await mkdir(skillPath("copied", "global", "universal"), { recursive: true });
@@ -260,22 +263,31 @@ test("a copy replaces managed directories without a backup and backs up a foreig
     missing: [],
     modified: ["claude", "universal"],
   });
-  const { backedUp } = await applySkill(
-    {
-      name: "copied",
-      source: "https://github.com/o/r",
-      path: "",
-      revision,
-      files: () => Promise.resolve(other),
-    },
-    {
+  const plan = {
+    name: "copied",
+    source: "https://github.com/o/r",
+    path: "",
+    revision,
+    files: () => Promise.resolve(other),
+  };
+  await expect(
+    applySkill(plan, {
       scope: "global",
       agents: ["claude", "opencode", "universal"],
       copy: { managed: ["claude", "opencode"] },
-    },
+    }),
+  ).rejects.toThrow("exists and is not managed by ski, skipped");
+  expect(await readFile(join(skillPath("copied", "global", "claude"), "SKILL.md"), "utf8")).toBe(
+    "edited\n",
   );
-  expect(backedUp.map((b) => b.agent)).toEqual(["universal"]);
-  for (const agent of ["claude", "opencode", "universal"] as const) {
+  expect(existsSync(join(skillPath("copied", "global", "universal"), "SKILL.md"))).toBe(false);
+
+  await applySkill(plan, {
+    scope: "global",
+    agents: ["claude", "opencode"],
+    copy: { managed: ["claude", "opencode"] },
+  });
+  for (const agent of ["claude", "opencode"] as const) {
     expect(await readFile(join(skillPath("copied", "global", agent), "SKILL.md"), "utf8")).toBe(
       "v2\n",
     );

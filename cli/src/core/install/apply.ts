@@ -2,7 +2,13 @@ import { existsSync } from "node:fs";
 import type { AgentId } from "./agents.ts";
 import type { SkillFile } from "../skill/files.ts";
 import type { Lockfile } from "./lockfile.ts";
-import { assertSkillsDirSafe, copySkill, linkSkill, writeCanonical } from "./link.ts";
+import {
+  assertNotForeign,
+  assertSkillsDirSafe,
+  copySkill,
+  linkSkill,
+  writeCanonical,
+} from "./link.ts";
 import type { Scope } from "../paths.ts";
 import type { Revision } from "../source/revision.ts";
 import { readDirFiles } from "../skill/files.ts";
@@ -24,11 +30,6 @@ export interface ApplyTarget {
   copy?: { managed: AgentId[] };
 }
 
-export interface Backup {
-  agent: AgentId;
-  path: string;
-}
-
 const ensureStoreEntry = async (
   plan: ApplyPlan,
 ): Promise<Materialized & { files: SkillFile[] }> => {
@@ -46,16 +47,21 @@ const ensureStoreEntry = async (
 export const applySkill = async (
   plan: ApplyPlan,
   target: ApplyTarget,
-): Promise<{ backedUp: Backup[]; integrity: string; restored: boolean }> => {
-  for (const agent of target.agents) await assertSkillsDirSafe(target.scope, agent);
+): Promise<{ integrity: string; restored: boolean }> => {
+  const managedCopy = (agent: AgentId): boolean => target.copy?.managed.includes(agent) === true;
+  // Refuse every foreign entry up front so a failed skill leaves no canonical copy behind.
+  for (const agent of target.agents) {
+    await assertSkillsDirSafe(target.scope, agent);
+    if (!managedCopy(agent)) await assertNotForeign(plan.name, target.scope, agent);
+  }
   const { integrity, restored, files } = await ensureStoreEntry(plan);
   if (!target.copy) await writeCanonical(plan.name, files, target.scope);
-  const backedUp: Backup[] = [];
   for (const agent of target.agents) {
-    const path = target.copy
-      ? await copySkill(plan.name, files, target.scope, agent, target.copy.managed.includes(agent))
-      : await linkSkill(plan.name, target.scope, agent);
-    if (path) backedUp.push({ agent, path });
+    if (target.copy) {
+      await copySkill(plan.name, files, target.scope, agent, managedCopy(agent));
+    } else {
+      await linkSkill(plan.name, target.scope, agent);
+    }
   }
   if (target.lock) {
     target.lock.skills[plan.name] = {
@@ -68,5 +74,5 @@ export const applySkill = async (
         : {}),
     };
   }
-  return { backedUp, integrity, restored };
+  return { integrity, restored };
 };

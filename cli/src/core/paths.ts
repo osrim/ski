@@ -37,6 +37,9 @@ export const userHome = (): string => {
   throw new Error("Cannot determine your home directory. Set HOME to an absolute path.");
 };
 
+export const tildify = (path: string): string =>
+  path.startsWith(userHome()) ? path.replace(userHome(), "~") : path;
+
 export const claudeDir = (): string => envPath("CLAUDE_HOME") ?? join(userHome(), ".claude");
 
 const xdgDir = (variable: string, homeSegment: string): string =>
