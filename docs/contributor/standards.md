@@ -58,4 +58,4 @@ CI runs the same checks. PR titles use a conventional commit type and a lowercas
 
 ## Repository hygiene
 
-Keep `@0scrm/ski` publishable. Do not commit `.DS_Store` or machine-local skill links. The project uses the MIT license.
+Do not commit `.DS_Store`, `cli/dist/`, or machine-local skill links. The project uses the MIT license.
