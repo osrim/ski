@@ -34,10 +34,10 @@ Use `bun run lint:fix` and `bun run fmt` to apply fixes.
 ## Read before coding
 
 - [Glossary](CONTEXT.md) for project terms
-- [Code standards](docs/standards.md) for quality rules
-- [Architecture](docs/architecture.md) for module boundaries
-- [CLI reference](docs/command-surface.md) for commands and flags
-- [Terminal output](docs/interaction.md) for prompts and output
+- [Code standards](docs/contributor/standards.md) for quality rules
+- [Architecture](docs/contributor/architecture.md) for module boundaries
+- [Terminal style](docs/contributor/terminal-style.md) for prompts and output
+- [Commands](docs/commands.md), [Configuration](docs/configuration.md), and [Security scan](docs/security-scan.md) for the user-facing contract
 
 Update the matching document when you change a command, exit code, or lockfile field.
 
