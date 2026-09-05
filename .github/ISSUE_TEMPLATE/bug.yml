@@ -1,0 +1,63 @@
+name: Bug report
+description: ski did something wrong.
+labels: [bug]
+body:
+  - type: checkboxes
+    id: searched
+    attributes:
+      label: Before filing
+      options:
+        - label: I searched the existing issues and read the [docs](https://github.com/osrim/ski/tree/main/docs).
+          required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `ski --version`.
+      placeholder: ski/0.2.0 darwin-arm64 bun-v1.3.0
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: macOS 15.6
+    validations:
+      required: true
+
+  - type: input
+    id: agent
+    attributes:
+      label: Agent
+      description: The agent you installed to (`claude`, `opencode`, `universal`).
+      placeholder: claude
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: Command
+      description: The exact command you ran.
+      render: sh
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: What ski printed. Put large output in a gist.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected
+      description: What you expected ski to do.
+    validations:
+      required: true
