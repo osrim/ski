@@ -4,7 +4,7 @@ import { dirname, isAbsolute, join, relative } from "node:path";
 import { git } from "../source/git.ts";
 import { linkedAgents, skillPath } from "./link.ts";
 import { readLock } from "./lockfile.ts";
-import { installedSkills } from "./placement.ts";
+import { installedSkills } from "./destination.ts";
 import { projectRoot } from "../paths.ts";
 
 const BLOCK_BEGIN = "# >>> ski: managed skill links (rebuilt by `ski install`)";

@@ -6,7 +6,7 @@ import { repoName } from "./coordinate.ts";
 export interface Revision {
   commit?: string;
   branch?: string;
-  mode: "auto" | "pin";
+  track: "auto" | "pin";
   pinnedAs?: string;
   tag?: string;
 }
@@ -51,11 +51,11 @@ export const resolveRevision = async (
     return {
       commit,
       branch: branchPin ? userRef : await defaultBranch(clone),
-      mode: "pin",
+      track: "pin",
       ...(branchPin || COMMIT_HASH.test(userRef) ? {} : { pinnedAs: userRef }),
     };
   }
   const branch = await defaultBranch(clone);
   const { commit, tag } = await resolveUpstream(clone, repo, branch);
-  return { commit, branch, mode: "auto", ...(tag ? { tag } : {}) };
+  return { commit, branch, track: "auto", ...(tag ? { tag } : {}) };
 };

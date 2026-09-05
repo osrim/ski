@@ -8,7 +8,7 @@
 ## Features
 
 - **Pick what you install**: `ski add owner/repo` lists the skills in a repository and lets you choose.
-- **One install, every agent**: _Claude Code_, _OpenCode_, and any agent that reads `.agents/skills`. Each skill is stored once and symlinked into every agent directory.
+- **One install, every agent**: _Claude Code_, _OpenCode_, and any agent that reads `.agents/skills`. Each skill is stored once and symlinked into every skills directory.
 - **Reviewed updates**: `ski update` compares each installed skill with its source and shows the diff before it changes anything.
 - **Dependencies**: skills that depend on other skills from the same source are detected, and `ski add` offers to add them too.
 - **Security scan**: every file is scanned before it is written. A critical finding stops the install until you approve it. See [Security scan](docs/security-scan.md).
@@ -30,7 +30,7 @@ ski install                 # restore every skill in ski-lock.json on a fresh ch
 ski update                  # check upstream and review what changed
 ```
 
-Commit `ski-lock.json`. `ski install` checks each file against the recorded hash before writing it, so teammates get the files you approved.
+Commit `ski-lock.json`. `ski install` checks each skill against the integrity recorded in `ski-lock.json` before writing it, so teammates get the files you approved.
 
 ## Docs
 

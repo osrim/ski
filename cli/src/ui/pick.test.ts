@@ -63,7 +63,7 @@ describe("pickSkillsToAdd", () => {
   const restoreEnv = captureEnv("HOME", "SKI_HOME", "CLAUDE_HOME", "XDG_CONFIG_HOME");
   const files: SkillFile[] = [{ path: "SKILL.md", content: Buffer.from("hi\n"), mode: "100644" }];
   const sourceId = "https://github.com/o/r";
-  const rev = { mode: "auto" as const };
+  const rev = { track: "auto" as const };
   const only = skill({ name: "adhd", path: "adhd" });
 
   beforeAll(async () => {
@@ -128,7 +128,7 @@ describe("pickSkillsToAdd", () => {
         name: "adhd",
         source: sourceId,
         path: "adhd",
-        revision: { mode: "auto" },
+        revision: { track: "auto" },
         files: () => Promise.resolve(files),
       },
       { scope: "global", agents: ["claude"], lock },
@@ -248,7 +248,7 @@ describe("pickSkillsToAdd", () => {
     expect(picked).toEqual({ skills: [changed], extend: [], asked: false });
   });
 
-  test("--all extends a copy row into the chosen agents its row does not name", async () => {
+  test("--all extends a copy entry into the chosen agents its row does not name", async () => {
     const lock = emptyLock();
     const copied = skill({ name: "copied", path: "copied" });
     await applySkill(
@@ -256,7 +256,7 @@ describe("pickSkillsToAdd", () => {
         name: "copied",
         source: sourceId,
         path: "copied",
-        revision: { mode: "auto" },
+        revision: { track: "auto" },
         files: () => Promise.resolve(files),
       },
       { scope: "global", agents: ["claude"], lock, copy: { managed: [] } },

@@ -5,7 +5,7 @@ import {
   unlinkSkill,
 } from "../core/install/link.ts";
 import { readLock } from "../core/install/lockfile.ts";
-import { installedSkills, placements } from "../core/install/placement.ts";
+import { installedSkills, locationsOf } from "../core/install/destination.ts";
 import { resolveScope, type ScopeOptions } from "../core/install/scope.ts";
 import { confirm, land } from "../ui/flow.ts";
 import type { CommandHelp } from "../ui/help.ts";
@@ -15,7 +15,7 @@ import { emptyScopeMessage } from "../ui/status.ts";
 import { skillName } from "../ui/style.ts";
 
 export const help: CommandHelp = {
-  description: "Remove selected lockfile rows and managed links or copies.",
+  description: "Remove selected lockfile entries and managed links or copies.",
   examples: ["$ ski remove", "$ ski rm grilling", "$ ski remove --all -y", "$ ski rm -g grilling"],
 };
 
@@ -34,7 +34,7 @@ export const run = async (names: string[], options: RemoveOptions): Promise<void
     outro(await emptyScopeMessage(scope));
     return;
   }
-  const held = await placements(installedSkills(lock), scope);
+  const locations = await locationsOf(installedSkills(lock), scope);
 
   const unknown = names.filter((name) => !installed.includes(name));
   if (unknown.length > 0) {
@@ -44,13 +44,13 @@ export const run = async (names: string[], options: RemoveOptions): Promise<void
   let selection = names;
   if (selection.length === 0 && options.all) selection = installed;
   if (selection.length === 0) {
-    selection = await pickToRemove(installed, lock, held);
+    selection = await pickToRemove(installed, lock, locations);
   }
   if (selection.length === 0) {
     outro("Nothing selected.");
     return;
   }
-  const agents = new Set(selection.flatMap((name) => held.get(name)!.agents));
+  const agents = new Set(selection.flatMap((name) => locations.get(name)!.agents));
   for (const agent of agents) {
     await assertSkillsDirSafe(scope, agent).catch((e: Error) => fail(e.message));
   }
@@ -69,11 +69,11 @@ export const run = async (names: string[], options: RemoveOptions): Promise<void
     items: selection,
     name: (name) => name,
     apply: async (name) => {
-      const { form, agents: from } = held.get(name)!;
+      const { mode, agents: from } = locations.get(name)!;
       for (const agent of from) {
-        await (form === "copy" ? removeCopy(name, scope, agent) : unlinkSkill(name, scope, agent));
+        await (mode === "copy" ? removeCopy(name, scope, agent) : unlinkSkill(name, scope, agent));
       }
-      if (form === "link") await removeCanonical(name, scope);
+      if (mode === "link") await removeCanonical(name, scope);
       delete lock.skills[name];
       return { success: from.length > 0 ? `removed from ${from.join(", ")}` : "removed" };
     },

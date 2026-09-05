@@ -7,11 +7,11 @@ const LOCKFILE_NAME = "ski-lock.json";
 export type Scope = "global" | "project";
 
 export const childPath = (dir: string, name: string): string => {
-  const target = join(dir, name);
-  if (basename(name) !== name || dirname(target) !== dir) {
+  const child = join(dir, name);
+  if (basename(name) !== name || dirname(child) !== dir) {
     throw new Error(`invalid skill name ${JSON.stringify(name)}`);
   }
-  return target;
+  return child;
 };
 
 export const envPath = (name: string, required = true): string | undefined => {

@@ -4,7 +4,7 @@ import type { DiscoveredSkill } from "./discover.ts";
 import type { SourceKind, Coordinate } from "./coordinate.ts";
 import type { Revision } from "./revision.ts";
 import type { SkillFile } from "../skill/files.ts";
-import type { InstalledSkill } from "../install/placement.ts";
+import type { InstalledSkill } from "../install/destination.ts";
 import { GitSource } from "./git-source.ts";
 import { LocalSource } from "./local-source.ts";
 

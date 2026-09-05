@@ -35,7 +35,7 @@ const buildCli = (): CAC => {
     .option("-p, --project", "Use project scope")
     .option("-a, --all", "Select all skills")
     .option("-y, --yes", "Skip ordinary confirmations")
-    .option("--agent <id>", "Target agent: claude, opencode, universal. Repeatable")
+    .option("--agent <id>", "Agents to install to: claude, opencode, universal. Repeatable")
     .option("--copy", "Copy directories instead of linking")
     .action(async (coordinate, skills, options) =>
       (await LOADERS.add()).run(coordinate, skills, options),
@@ -46,7 +46,7 @@ const buildCli = (): CAC => {
     .option("-g, --global", "Use the global scope")
     .option("-p, --project", "Use project scope")
     .option("-y, --yes", "Accept defaults and restore edits")
-    .option("--agent <id>", "Target agent: claude, opencode, universal. Repeatable")
+    .option("--agent <id>", "Agents to install to: claude, opencode, universal. Repeatable")
     .action(async (options) => (await LOADERS.install()).run(options));
   cli
     .command("update [...skills]", "Update skills from upstream")

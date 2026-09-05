@@ -11,7 +11,7 @@ export interface LockEntry {
   path: string;
   commit?: string;
   integrity: string;
-  mode: "auto" | "pin";
+  track: "auto" | "pin";
   pinnedAs?: string;
   tag?: string;
   copy?: true;
@@ -45,7 +45,7 @@ interface SerializedEntry {
   path: string;
   commit?: string | undefined;
   integrity: string;
-  mode: "auto" | "pin";
+  track: "auto" | "pin";
   pinnedAs?: string | undefined;
   tag?: string | undefined;
   copy?: true | undefined;
@@ -62,7 +62,7 @@ export const serializeLock = (lock: Lockfile): string => {
       path: entry.path,
       commit: entry.commit,
       integrity: entry.integrity,
-      mode: entry.mode,
+      track: entry.track,
       pinnedAs: entry.pinnedAs,
       tag: entry.tag,
       copy: entry.copy,
@@ -75,8 +75,8 @@ export const serializeLock = (lock: Lockfile): string => {
 // Zod reports the first invalid key. Check specific errors before generic fields.
 const EntrySchema = z
   .object({
-    mode: z.enum(["auto", "pin"], {
-      error: (issue) => `unknown mode ${JSON.stringify(issue.input)}`,
+    track: z.enum(["auto", "pin"], {
+      error: (issue) => `unknown track ${JSON.stringify(issue.input)}`,
     }),
     integrity: z
       .string({ error: "missing integrity" })
@@ -123,8 +123,8 @@ export const parseLock = (text: string, file: string): Lockfile => {
       const name = JSON.stringify(issue.path[1]);
       throw new Error(`${file}: invalid skill name ${name}`, { cause: parsed.error });
     }
-    const row = issue.path[0] === "skills" ? `${String(issue.path[1])}: ` : "";
-    throw new Error(`${file}: ${row}${issue.message}`, { cause: parsed.error });
+    const where = issue.path[0] === "skills" ? `${String(issue.path[1])}: ` : "";
+    throw new Error(`${file}: ${where}${issue.message}`, { cause: parsed.error });
   }
   const skills: Record<string, LockEntry> = {};
   for (const [name, entry] of Object.entries(parsed.data.skills)) {
@@ -134,7 +134,7 @@ export const parseLock = (text: string, file: string): Lockfile => {
       path: entry.path,
       ...(entry.commit === undefined ? {} : { commit: entry.commit }),
       integrity: entry.integrity,
-      mode: entry.mode,
+      track: entry.track,
       ...(entry.pinnedAs === undefined ? {} : { pinnedAs: entry.pinnedAs }),
       ...(entry.tag === undefined ? {} : { tag: entry.tag }),
       ...(entry.copy === undefined ? {} : { copy: entry.copy }),

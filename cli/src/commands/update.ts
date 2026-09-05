@@ -1,18 +1,18 @@
 import * as p from "@clack/prompts";
-import { applySkill, type ApplyTarget } from "../core/install/apply.ts";
+import { applySkill, type Destination } from "../core/install/apply.ts";
 import { readLock, type Lockfile } from "../core/install/lockfile.ts";
 import { canonicalPath } from "../core/install/link.ts";
 import {
   installedSkills,
   modifiedSkills,
-  updatePlacement,
+  updateDestination,
   type InstalledSkill,
-} from "../core/install/placement.ts";
+} from "../core/install/destination.ts";
 import type { Scope } from "../core/paths.ts";
 import { displayLabel, shortId } from "../core/source/revision.ts";
 import { resolveScope, scopeFlag, type ScopeOptions } from "../core/install/scope.ts";
 import {
-  computeStatus,
+  computeVerdicts,
   selectUpdates,
   type MovedVerdict,
   type OutdatedVerdict,
@@ -73,22 +73,22 @@ export const run = async (names: string[], options: UpdateOptions): Promise<void
 
   const verdicts = await withSpinner(
     `Checking upstream for ${skills.length} skill(s)`,
-    () => computeStatus(skills, names),
+    () => computeVerdicts(skills, names),
     () => "Checked upstream sources",
   );
   const { moved, outdated } = reportVerdicts(verdicts, names, scope);
 
-  const placementOf = (skill: InstalledSkill): Promise<ApplyTarget> =>
-    placementFor(skill, scope, lock);
+  const destinationOf = (skill: InstalledSkill): Promise<Destination> =>
+    destinationFor(skill, scope, lock);
 
   if (outdated.length === 0) {
-    return landUpdates(moved, [], placementOf, scope, lock, "Nothing to update.");
+    return landUpdates(moved, [], destinationOf, scope, lock, "Nothing to update.");
   }
 
-  const bumped = new Set(moved.map((status) => status.skill.name));
+  const movedNames = new Set(moved.map((verdict) => verdict.skill.name));
   const selection = selectUpdates(outdated, names, options.all ?? false);
   for (const name of selection.skipped) {
-    if (!bumped.has(name)) p.log.info(`${skillName(name)}: up to date`);
+    if (!movedNames.has(name)) p.log.info(`${skillName(name)}: up to date`);
   }
 
   let selected = selection.selected;
@@ -97,55 +97,55 @@ export const run = async (names: string[], options: UpdateOptions): Promise<void
     selected = selectUpdates(outdated, picked, false).selected;
   }
   if (selected.length === 0) {
-    return landUpdates(moved, [], placementOf, scope, lock, "Nothing selected.");
+    return landUpdates(moved, [], destinationOf, scope, lock, "Nothing selected.");
   }
 
   logSourceCaution();
   const approved = await previewAndReview(selected, scope, options.yes);
   if (approved.length === 0) {
-    return landUpdates(moved, [], placementOf, scope, lock, "Nothing selected.");
+    return landUpdates(moved, [], destinationOf, scope, lock, "Nothing selected.");
   }
   await reportUpdateDeps(approved, lock, scope);
 
   const proceed = await confirm(
-    `Update ${approved.map((item) => skillName(item.status.skill.name)).join(", ")} (${scope})?`,
+    `Update ${approved.map((item) => skillName(item.verdict.skill.name)).join(", ")} (${scope})?`,
     { yes: options.yes, command: "update" },
   );
   if (!proceed) {
-    return landUpdates(moved, [], placementOf, scope, lock, "Nothing selected.");
+    return landUpdates(moved, [], destinationOf, scope, lock, "Nothing selected.");
   }
 
-  await landUpdates(moved, approved, placementOf, scope, lock, "Nothing selected.");
+  await landUpdates(moved, approved, destinationOf, scope, lock, "Nothing selected.");
 };
 
-type PlacementOf = (skill: InstalledSkill) => Promise<ApplyTarget>;
+type DestinationOf = (skill: InstalledSkill) => Promise<Destination>;
 
-const placementFor = async (
+const destinationFor = async (
   skill: InstalledSkill,
   scope: Scope,
   lock: Lockfile,
-): Promise<ApplyTarget> => {
-  const { target, defaulted } = await updatePlacement(skill, scope, lock);
+): Promise<Destination> => {
+  const { destination, defaulted } = await updateDestination(skill, scope, lock);
   if (defaulted) {
-    warn(`${skillName(skill.name)}: not linked. Relinking to ${target.agents.join(", ")}.`);
+    warn(`${skillName(skill.name)}: missing. Linking to ${destination.agents.join(", ")}.`);
   }
-  return target;
+  return destination;
 };
 
 type UpdateAction =
-  | { kind: "bump"; status: MovedVerdict }
+  | { kind: "moved"; verdict: MovedVerdict }
   | { kind: "update"; updated: UpdatedFiles };
 
 const landUpdates = async (
   moved: MovedVerdict[],
   approved: UpdatedFiles[],
-  placementOf: PlacementOf,
+  destinationOf: DestinationOf,
   scope: Scope,
   lock: Lockfile,
   nothing: string,
 ): Promise<void> => {
   const items: UpdateAction[] = [
-    ...moved.map((status) => ({ kind: "bump" as const, status })),
+    ...moved.map((verdict) => ({ kind: "moved" as const, verdict })),
     ...approved.map((updated) => ({ kind: "update" as const, updated })),
   ];
   if (items.length === 0) {
@@ -155,14 +155,14 @@ const landUpdates = async (
   await land({
     items,
     name: (item) =>
-      item.kind === "bump" ? item.status.skill.name : item.updated.status.skill.name,
+      item.kind === "moved" ? item.verdict.skill.name : item.updated.verdict.skill.name,
     apply: (item) =>
-      item.kind === "bump"
-        ? recordBump(item.status, placementOf)
-        : applyUpdate(item.updated, placementOf),
+      item.kind === "moved"
+        ? recordMoved(item.verdict, destinationOf)
+        : applyUpdate(item.updated, destinationOf),
     spinner: (item) =>
-      item.kind === "bump"
-        ? `Recording ${skillName(item.status.skill.name)} at ${displayLabel(item.status.upstream)}`
+      item.kind === "moved"
+        ? `Recording ${skillName(item.verdict.skill.name)} at ${displayLabel(item.verdict.upstream)}`
         : null,
     scope,
     lock,
@@ -170,25 +170,25 @@ const landUpdates = async (
   });
 };
 
-const recordBump = async (
-  status: MovedVerdict,
-  placementOf: PlacementOf,
+const recordMoved = async (
+  verdict: MovedVerdict,
+  destinationOf: DestinationOf,
 ): Promise<{ integrity: string; restored: boolean; success: string }> => {
-  const { skill } = status;
-  const placement = await placementOf(skill);
+  const { skill } = verdict;
+  const destination = await destinationOf(skill);
   const result = await applySkill(
     {
       name: skill.name,
       source: skill.source,
       path: skill.path,
-      revision: status.upstream,
-      files: () => status.source.fetchFiles(status.upstream.commit, skill.path),
+      revision: verdict.upstream,
+      files: () => verdict.source.fetchFiles(verdict.upstream.commit, skill.path),
     },
-    placement,
+    destination,
   );
   return {
     ...result,
-    success: `${displayLabel(skill)} → ${displayLabel(status.upstream)}. No file changes.`,
+    success: `${displayLabel(skill)} → ${displayLabel(verdict.upstream)}. No file changes.`,
   };
 };
 
@@ -198,47 +198,47 @@ const previewAndReview = async (
   yes: boolean | undefined,
 ): Promise<UpdatedFiles[]> => {
   const approved: UpdatedFiles[] = [];
-  for (const status of selected) {
-    const { skill } = status;
-    const to = status.upstream.commit;
+  for (const verdict of selected) {
+    const { skill } = verdict;
+    const to = verdict.upstream.commit;
     const { changes, files } = await withSpinner(
       `Reading ${skillName(skill.name)}`,
       async () => ({
-        changes: await status.source.changes(skill, to, canonicalPath(skill.name, scope)),
-        files: await status.source.fetchFiles(to, skill.path),
+        changes: await verdict.source.changes(skill, to, canonicalPath(skill.name, scope)),
+        files: await verdict.source.fetchFiles(to, skill.path),
       }),
       (read) => `${skillName(skill.name)}: read ${read.files.length} file(s)`,
     );
-    const ids = to ? `: ${shortId(skill)} → ${shortId(status.upstream)}` : "";
+    const ids = to ? `: ${shortId(skill)} → ${shortId(verdict.upstream)}` : "";
     p.note(truncate(changes.patch), `${skillName(skill.name)}${ids}`);
 
-    approved.push({ status, files });
+    approved.push({ verdict, files });
   }
   const review = await reviewSkills(
-    approved.map(({ status, files }) => ({ name: status.skill.name, files, status })),
+    approved.map(({ verdict, files }) => ({ name: verdict.skill.name, files, verdict })),
     yes,
   );
-  return review.approved.map(({ status, files }) => ({ status, files }));
+  return review.approved.map(({ verdict, files }) => ({ verdict, files }));
 };
 
 const applyUpdate = async (
-  { status, files }: UpdatedFiles,
-  placementOf: PlacementOf,
+  { verdict, files }: UpdatedFiles,
+  destinationOf: DestinationOf,
 ): Promise<{ restored: boolean; success: string }> => {
-  const { skill } = status;
+  const { skill } = verdict;
   const { integrity, restored } = await applySkill(
     {
       name: skill.name,
       source: skill.source,
       path: skill.path,
-      revision: status.upstream,
+      revision: verdict.upstream,
       files: () => Promise.resolve(files),
     },
-    await placementOf(skill),
+    await destinationOf(skill),
   );
   const range =
-    revisionRange(status) ||
-    `${displayLabel(skill)} → ${displayLabel({ ...status.upstream, integrity })}`;
+    revisionRange(verdict) ||
+    `${displayLabel(skill)} → ${displayLabel({ ...verdict.upstream, integrity })}`;
   return { restored, success: `updated ${range}` };
 };
 

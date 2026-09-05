@@ -8,7 +8,7 @@ import { failNoTTY, isInteractive, unwrap, withSpinner } from "./prompt.ts";
 import { logSkillError } from "./report.ts";
 import { warnRestored } from "./status.ts";
 import { skillName } from "./style.ts";
-import { hideLinksFromGit } from "./target.ts";
+import { hideLinksFromGit } from "./destination.ts";
 
 export interface SkillFiles {
   skill: DiscoveredSkill;

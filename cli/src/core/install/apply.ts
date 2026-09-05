@@ -3,7 +3,7 @@ import type { AgentId } from "./agents.ts";
 import type { SkillFile } from "../skill/files.ts";
 import type { Lockfile } from "./lockfile.ts";
 import {
-  assertNotForeign,
+  refuseUnmanaged,
   assertSkillsDirSafe,
   copySkill,
   linkSkill,
@@ -23,7 +23,7 @@ interface ApplyPlan {
   files: () => Promise<SkillFile[]>;
 }
 
-export interface ApplyTarget {
+export interface Destination {
   scope: Scope;
   agents: AgentId[];
   lock?: Lockfile;
@@ -46,31 +46,32 @@ const ensureStoreEntry = async (
 
 export const applySkill = async (
   plan: ApplyPlan,
-  target: ApplyTarget,
+  destination: Destination,
 ): Promise<{ integrity: string; restored: boolean }> => {
-  const managedCopy = (agent: AgentId): boolean => target.copy?.managed.includes(agent) === true;
-  // Refuse every foreign entry up front so a failed skill leaves no canonical copy behind.
-  for (const agent of target.agents) {
-    await assertSkillsDirSafe(target.scope, agent);
-    if (!managedCopy(agent)) await assertNotForeign(plan.name, target.scope, agent);
+  const managedCopy = (agent: AgentId): boolean =>
+    destination.copy?.managed.includes(agent) === true;
+  // Refuse every unmanaged path up front so a failed skill leaves no canonical copy behind.
+  for (const agent of destination.agents) {
+    await assertSkillsDirSafe(destination.scope, agent);
+    if (!managedCopy(agent)) await refuseUnmanaged(plan.name, destination.scope, agent);
   }
   const { integrity, restored, files } = await ensureStoreEntry(plan);
-  if (!target.copy) await writeCanonical(plan.name, files, target.scope);
-  for (const agent of target.agents) {
-    if (target.copy) {
-      await copySkill(plan.name, files, target.scope, agent, managedCopy(agent));
+  if (!destination.copy) await writeCanonical(plan.name, files, destination.scope);
+  for (const agent of destination.agents) {
+    if (destination.copy) {
+      await copySkill(plan.name, files, destination.scope, agent, managedCopy(agent));
     } else {
-      await linkSkill(plan.name, target.scope, agent);
+      await linkSkill(plan.name, destination.scope, agent);
     }
   }
-  if (target.lock) {
-    target.lock.skills[plan.name] = {
+  if (destination.lock) {
+    destination.lock.skills[plan.name] = {
       source: plan.source,
       path: plan.path,
       ...plan.revision,
       integrity,
-      ...(target.copy
-        ? { copy: true, agents: [...new Set([...target.copy.managed, ...target.agents])] }
+      ...(destination.copy
+        ? { copy: true, agents: [...new Set([...destination.copy.managed, ...destination.agents])] }
         : {}),
     };
   }

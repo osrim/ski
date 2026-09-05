@@ -2,7 +2,11 @@ import * as p from "@clack/prompts";
 import { applySkill } from "../core/install/apply.ts";
 import { assertSkillsDirSafe } from "../core/install/link.ts";
 import { readLock } from "../core/install/lockfile.ts";
-import { installedSkills, installPlacement, modifiedSkills } from "../core/install/placement.ts";
+import {
+  installedSkills,
+  installDestination,
+  modifiedSkills,
+} from "../core/install/destination.ts";
 import { shortId } from "../core/source/revision.ts";
 import { resolveScope, type ScopeOptions } from "../core/install/scope.ts";
 import { sourceFor } from "../core/source/index.ts";
@@ -13,7 +17,7 @@ import { fail, isInteractive, unwrap } from "../ui/prompt.ts";
 import { logError, logSkillError } from "../ui/report.ts";
 import { reportModified } from "../ui/status.ts";
 import { skillName } from "../ui/style.ts";
-import { chooseAgents, warnScopeCollisions } from "../ui/target.ts";
+import { chooseAgents, warnScopeCollisions } from "../ui/destination.ts";
 
 export const help: CommandHelp = {
   description: "Restore every skill in ski-lock.json. Modified files need confirmation.",
@@ -67,7 +71,7 @@ export const run = async (options: InstallOptions): Promise<void> => {
           "modified, skipped\nCopy the edits or run `ski install -y` to discard them.",
         );
       }
-      const target = await installPlacement(entry, scope, agents);
+      const destination = await installDestination(entry, scope, agents);
       const source = sourceFor(entry.source);
       const { restored } = await applySkill(
         {
@@ -78,7 +82,7 @@ export const run = async (options: InstallOptions): Promise<void> => {
           integrity: entry.integrity,
           files: () => source.fetchFiles(entry.commit, entry.path),
         },
-        target,
+        destination,
       );
       return {
         restored,

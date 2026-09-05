@@ -23,9 +23,9 @@ cli/src/
   index.ts
   test-env.ts        environment capture and restore, tests only
   commands/          add, install, update, remove, list
-  ui/                prompts, gate, reports, help, status, placement choices
+  ui/                prompts, gate, reports, help, status, destination choices
   core/
-    config.ts        saved scope and agent choices
+    config.ts        remembered scope and agent choices
     paths.ts         XDG roots, project root, lockfile path
     suggest.ts       command typo suggestions
     update-check.ts  registry version check
@@ -33,7 +33,7 @@ cli/src/
     source/          coordinates, Git and local sources, revisions, upstream
     skill/           files, frontmatter, integrity, dependency mentions
     scan/            scan rules and findings
-    install/         scope, agents, store, links, placement, lockfile
+    install/         scope, agents, store, links, destination, lockfile
 ```
 
 `core/source/` and `core/install/` are siblings. Runtime imports point from `install/` to `source/` only. Source adapters may type-import installed skill data. Commands and UI combine the two.
@@ -51,7 +51,7 @@ Every command that writes goes through `ui/flow.ts`, which exports `fetchSkillFi
 
 `land` applies each item, reports failures, writes the supplied lockfile after the batch, and hides managed links from Git. A failed item does not stop the batch. The command exits `1` and the lockfile matches what is on disk. `add` and `remove` always supply a lockfile. `update` supplies one only when a revision moved or a file update was approved. `install` supplies none because it restores the recorded state without changing it.
 
-`core/install/apply.ts` ensures a store entry exists, copies it to the canonical `skills/<name>` directory for the scope, and creates each requested link or copy. The store is a cache: a link row installs offline when the store already holds its integrity, and installed skills do not depend on the store.
+`core/install/apply.ts` ensures a store entry exists, copies it to the canonical `skills/<name>` directory for the scope, and creates each requested link or copy. The store is a cache: a link entry installs offline when the store already holds its integrity, and installed skills do not depend on the store.
 
 ## Review gate
 
@@ -59,6 +59,6 @@ New or changed files pass through `ui/gate.ts`. The gate lists files, runs the s
 
 - `add` reaches the gate for every new skill and for dependencies it offers to install.
 - `update` reaches the gate only when skill files changed. A moved revision with identical files skips it. Missing dependencies are reported, not installed.
-- `install` never reaches the gate. Every lockfile row records content that already passed it, and the integrity check proves the files still match.
+- `install` never reaches the gate. Every lockfile entry records content that already passed it, and the integrity check proves the files still match.
 
 An approval covers one source, path, integrity, and scope. Adding approved content to another agent does not reopen the gate.

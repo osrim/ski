@@ -2,7 +2,7 @@ import * as p from "@clack/prompts";
 import type { AgentId } from "../core/install/agents.ts";
 import { skillPath } from "../core/install/link.ts";
 import { readLock, type LockEntry, type Lockfile } from "../core/install/lockfile.ts";
-import { installedSkills, modifiedSkills, placements } from "../core/install/placement.ts";
+import { installedSkills, modifiedSkills, locationsOf } from "../core/install/destination.ts";
 import { lockPath, type Scope } from "../core/paths.ts";
 import { displayLabel } from "../core/source/revision.ts";
 import { resolveScope, scopeFlag, type ScopeOptions } from "../core/install/scope.ts";
@@ -44,25 +44,25 @@ export const run = async (options: ListOptions): Promise<void> => {
 
   p.log.step(`Installed skills (${tildify(lockPath(scope))})`);
   printRows(rows);
-  reportUnlinked(rows);
+  reportMissing(rows);
   reportModifiedRows(rows, scope);
   p.outro(summaryLine(rows, scope));
 };
 
 const buildRows = async (lock: Lockfile, scope: Scope): Promise<ListRow[]> => {
   const skills = installedSkills(lock);
-  const held = await placements(skills, scope);
+  const locations = await locationsOf(skills, scope);
   const modified = await modifiedSkills(skills, scope);
   return skills.map(({ name, ...entry }) => ({
     name,
     entry,
-    agents: held.get(name)!.agents,
+    agents: locations.get(name)!.agents,
     modified: modified.has(name),
   }));
 };
 
 const agentsText = (row: ListRow): string => {
-  if (row.agents.length === 0) return "not linked";
+  if (row.agents.length === 0) return "missing";
   return row.entry.copy ? `${row.agents.join(", ")} ${dim("copy")}` : row.agents.join(", ");
 };
 
@@ -88,11 +88,11 @@ const printRows = (rows: ListRow[]): void => {
   }
 };
 
-const reportUnlinked = (rows: ListRow[]): void => {
+const reportMissing = (rows: ListRow[]): void => {
   const missing = rows.filter((row) => row.agents.length === 0);
   if (missing.length === 0) return;
   p.log.info(
-    `${missing.length} not installed: ${missing.map((row) => skillName(row.name)).join(", ")}\nRun \`ski install\`.`,
+    `${missing.length} missing: ${missing.map((row) => skillName(row.name)).join(", ")}\nRun \`ski install\`.`,
   );
 };
 
@@ -109,7 +109,7 @@ const summaryLine = (rows: ListRow[], scope: Scope): string => {
   const missing = rows.filter((row) => row.agents.length === 0).length;
   const modified = rows.filter((row) => row.modified).length;
   const notes = [
-    ...(missing > 0 ? [`${missing} not installed`] : []),
+    ...(missing > 0 ? [`${missing} missing`] : []),
     ...(modified > 0 ? [`${modified} modified`] : []),
   ];
   const verb = missing > 0 ? "recorded" : "installed";

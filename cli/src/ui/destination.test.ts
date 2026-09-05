@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { agentRows, preferredAgents, shadowNote } from "./target.ts";
+import { agentRows, preferredAgents, shadowNote } from "./destination.ts";
 
 const SGR = new RegExp(`${"\\u001B"}\\[[\\d;]*m`, "gu");
 const plain = (text: string): string => text.replace(SGR, "");
@@ -23,7 +23,7 @@ test("the marker separates opt-in from undetected", () => {
   expect(plain(rows[2]!.label)).toEndWith("(opt-in)");
 });
 
-test("a saved agent set takes precedence over detection in the picker", () => {
+test("a remembered agent set takes precedence over detection in the picker", () => {
   expect(preferredAgents(["opencode", "universal"], ["claude"])).toEqual(["opencode", "universal"]);
   expect(preferredAgents(undefined, ["opencode"])).toEqual(["opencode"]);
 });

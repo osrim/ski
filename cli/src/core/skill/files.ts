@@ -63,13 +63,13 @@ export const readDirFiles = async (dir: string): Promise<SkillFile[]> => {
 export const writeFiles = async (dest: string, files: SkillFile[]): Promise<void> => {
   if (files.length === 0) throw new Error("nothing to install: skill has no files");
   for (const file of files) {
-    const target = join(dest, file.path);
-    await mkdir(dirname(target), { recursive: true });
+    const out = join(dest, file.path);
+    await mkdir(dirname(out), { recursive: true });
     if (isSymlink(file.mode)) {
-      await symlink(file.content.toString("utf8"), target);
+      await symlink(file.content.toString("utf8"), out);
     } else {
-      await writeFile(target, file.content);
-      if (file.mode === MODE_EXEC) await chmod(target, 0o755);
+      await writeFile(out, file.content);
+      if (file.mode === MODE_EXEC) await chmod(out, 0o755);
     }
   }
 };

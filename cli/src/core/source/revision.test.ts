@@ -51,18 +51,18 @@ afterAll(async () => {
   await rm(tmp, { recursive: true, force: true });
 });
 
-test("no releases: auto mode follows branch HEAD, no tag", async () => {
+test("no releases: track auto follows branch HEAD, no tag", async () => {
   const clone = await ensureClone(upstream);
   const rev = await resolveRevision(clone, upstream);
-  expect(rev).toEqual({ commit: second, branch: "main", mode: "auto" });
+  expect(rev).toEqual({ commit: second, branch: "main", track: "auto" });
 });
 
-test("with a release: auto mode resolves the latest semver tag", async () => {
+test("with a release: track auto resolves the latest semver tag", async () => {
   await $`git -C ${upstream} -c tag.gpgSign=false -c tag.forceSignAnnotated=false tag v0.1.0 ${first}`.quiet();
   const clone = await ensureClone(upstream);
   await $`git -C ${clone} fetch --quiet --prune --tags --force origin`.quiet();
   const rev = await resolveRevision(clone, upstream);
-  expect(rev).toEqual({ commit: first, branch: "main", mode: "auto", tag: "v0.1.0" });
+  expect(rev).toEqual({ commit: first, branch: "main", track: "auto", tag: "v0.1.0" });
 
   const latest = await resolveUpstream(clone, upstream, "main");
   expect(latest).toEqual({ commit: first, tag: "v0.1.0" });
@@ -71,17 +71,17 @@ test("with a release: auto mode resolves the latest semver tag", async () => {
 test("pin to a tag: pinnedAs records the symbolic ref", async () => {
   const clone = await ensureClone(upstream);
   const rev = await resolveRevision(clone, upstream, "v0.1.0");
-  expect(rev).toEqual({ commit: first, branch: "main", mode: "pin", pinnedAs: "v0.1.0" });
+  expect(rev).toEqual({ commit: first, branch: "main", track: "pin", pinnedAs: "v0.1.0" });
 });
 
 test("pin to a branch: no pinnedAs (branches move legitimately)", async () => {
   const clone = await ensureClone(upstream);
   const rev = await resolveRevision(clone, upstream, "main");
-  expect(rev).toEqual({ commit: second, branch: "main", mode: "pin" });
+  expect(rev).toEqual({ commit: second, branch: "main", track: "pin" });
 });
 
 test("pin to a full commit: no pinnedAs (nothing symbolic to drift)", async () => {
   const clone = await ensureClone(upstream);
   const rev = await resolveRevision(clone, upstream, first);
-  expect(rev).toEqual({ commit: first, branch: "main", mode: "pin" });
+  expect(rev).toEqual({ commit: first, branch: "main", track: "pin" });
 });

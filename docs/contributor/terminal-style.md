@@ -15,7 +15,7 @@ Every prompt has a flag replacement, and the replacements do not overlap:
 - A critical finding needs a terminal. Without one, the skill is skipped with exit `3`.
 - A prompt with no terminal and no flag exits `2` with a message that names the flag.
 
-`install` is the exception to the last rule. Without a terminal it keeps modified skills and installs the other rows, because restoring silently would destroy edits.
+`install` is the exception to the last rule. Without a terminal it keeps modified skills and installs the other entries, because restoring silently would destroy edits.
 
 Each skill gets at most one review question.
 

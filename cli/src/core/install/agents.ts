@@ -83,7 +83,7 @@ export const overlapWarning = (agents: AgentId[]): string | null => {
   const clashes = agents.filter((agent) => agent === "claude" || agent === "universal");
   if (clashes.length === 0) return null;
   const dirs = clashes.map((agent) => `${agentDef(agent).rootDir}/skills`).join(" and ");
-  return `opencode also reads ${dirs}. Pick one target to avoid loading skills twice.`;
+  return `opencode also reads ${dirs}. Pick one agent to avoid loading skills twice.`;
 };
 
 export const ancestorSkillsDirs = (): string[] => {

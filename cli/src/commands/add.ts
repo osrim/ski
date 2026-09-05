@@ -1,7 +1,7 @@
 import * as p from "@clack/prompts";
 import { applySkill } from "../core/install/apply.ts";
 import { assertSkillsDirSafe } from "../core/install/link.ts";
-import { addPlacement } from "../core/install/placement.ts";
+import { addDestination, type Mode } from "../core/install/destination.ts";
 import type { DiscoveredSkill } from "../core/source/discover.ts";
 import type { SkillFile } from "../core/skill/files.ts";
 import { readLock, type Lockfile } from "../core/install/lockfile.ts";
@@ -35,8 +35,7 @@ import {
   chooseScope,
   warnAncestorCollisions,
   warnScopeCollisions,
-  type LinkVerb,
-} from "../ui/target.ts";
+} from "../ui/destination.ts";
 
 export const help: CommandHelp = {
   description: "Fetch, review, and add skills. Use --copy to write directories instead of links.",
@@ -102,9 +101,9 @@ export const run = async (
   if (!fetched) return;
   const { rev, skills } = fetched;
 
-  const { scope, agents } = await chooseTargets(options, {
+  const { scope, agents } = await chooseDestination(options, {
     where: mode.where,
-    verb: mode.verb,
+    mode: mode.verb,
   });
   const scopedSource = source.forScope(scope);
 
@@ -152,12 +151,12 @@ export const run = async (
   if (scope === "project") warnAncestorCollisions(landing);
   warnScopeCollisions(landing, scope, agents);
 
-  const dest = { source: scopedSource, rev, ref: parsed.ref, scope, agents, lock, copy, mode };
+  const context = { source: scopedSource, rev, ref: parsed.ref, scope, agents, lock, copy, mode };
   await land({
     items: [...approved, ...picked.extend],
     name: (item) => item.skill.name,
     apply: (item) =>
-      "files" in item ? addSkill(item.skill, item.files, dest) : extendSkill(item, dest),
+      "files" in item ? addSkill(item.skill, item.files, context) : extendSkill(item, context),
     scope,
     lock,
     outro: (added) => `Added ${added} skill(s). ${scope}: ${agents.join(", ")}.`,
@@ -173,17 +172,17 @@ const parseCoordinateOrFail = (raw: string): Coordinate => {
   }
 };
 
-interface Targets {
+interface Destination {
   scope: Scope;
   agents: AgentId[];
 }
 
-const chooseTargets = async (
+const chooseDestination = async (
   options: AddOptions,
-  prompts: { where: string; verb: LinkVerb },
-): Promise<Targets> => {
+  prompts: { where: string; mode: Mode },
+): Promise<Destination> => {
   const scope = await chooseScope(options, prompts.where);
-  const agents = await chooseAgents(options, scope, prompts.verb);
+  const agents = await chooseAgents(options, scope, prompts.mode);
   for (const agent of agents) {
     await assertSkillsDirSafe(scope, agent).catch((e: Error) => fail(e.message));
   }
@@ -243,7 +242,7 @@ const approveNew = async (
   return [...approved, ...deps.added];
 };
 
-interface Destination {
+interface AddContext {
   source: Source;
   rev: Revision;
   ref: string | undefined;
@@ -257,42 +256,42 @@ interface Destination {
 const addSkill = async (
   skill: DiscoveredSkill,
   files: SkillFile[],
-  dest: Destination,
+  context: AddContext,
 ): Promise<{ integrity: string; restored: boolean; success: string }> => {
   const { integrity, restored } = await applySkill(
     {
       name: skill.name,
-      source: dest.source.id,
+      source: context.source.id,
       path: skill.path,
-      revision: dest.rev,
+      revision: context.rev,
       files: () => Promise.resolve(files),
     },
-    addPlacement(dest.lock.skills[skill.name], dest),
+    addDestination(context.lock.skills[skill.name], context),
   );
-  const label = shownLabel(dest.ref, { ...dest.rev, integrity });
-  return { restored, integrity, success: `${dest.mode.landed} @ ${label}` };
+  const label = shownLabel(context.ref, { ...context.rev, integrity });
+  return { restored, integrity, success: `${context.mode.landed} @ ${label}` };
 };
 
 const extendSkill = async (
   { skill, agents }: Extension,
-  dest: Destination,
+  context: AddContext,
 ): Promise<{ integrity: string; restored: boolean; success: string }> => {
-  const row = dest.lock.skills[skill.name]!;
+  const entry = context.lock.skills[skill.name]!;
   const { restored } = await applySkill(
     {
       name: skill.name,
-      source: dest.source.id,
+      source: context.source.id,
       path: skill.path,
-      revision: row,
-      integrity: row.integrity,
-      files: () => dest.source.fetchFiles(dest.rev.commit, skill.path),
+      revision: entry,
+      integrity: entry.integrity,
+      files: () => context.source.fetchFiles(context.rev.commit, skill.path),
     },
-    addPlacement(row, { ...dest, agents }),
+    addDestination(entry, { ...context, agents }),
   );
-  const label = displayLabel(row);
+  const label = displayLabel(entry);
   return {
     restored,
-    integrity: row.integrity,
-    success: `${dest.mode.extended} into ${agents.join(", ")} @ ${label}`,
+    integrity: entry.integrity,
+    success: `${context.mode.extended} into ${agents.join(", ")} @ ${label}`,
   };
 };

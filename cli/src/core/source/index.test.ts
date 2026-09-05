@@ -12,7 +12,7 @@ import {
 import { readDirFiles } from "../skill/files.ts";
 import { integrityOf } from "../skill/integrity.ts";
 import { materialize } from "../install/store.ts";
-import type { InstalledSkill } from "../install/placement.ts";
+import type { InstalledSkill } from "../install/destination.ts";
 
 let tmp: string;
 let dir: string;
@@ -27,7 +27,7 @@ const installed = (
   source,
   path,
   integrity,
-  mode: "auto",
+  track: "auto",
 });
 
 beforeAll(async () => {
@@ -65,7 +65,7 @@ test("a local source discovers the same layouts a repo does", async () => {
 
 test("a directory resolves to a revision with neither commit nor branch", async () => {
   const source = sourceForCoordinate({ repo: dir, kind: "local" });
-  expect(await source.resolve()).toEqual({ mode: "auto" });
+  expect(await source.resolve()).toEqual({ track: "auto" });
 });
 
 test("each skill is pinned by its own files, so a sibling edit leaves it alone", async () => {
@@ -81,7 +81,7 @@ test("each skill is pinned by its own files, so a sibling edit leaves it alone",
   await writeFile(join(dir, "skills", "alpha", "SKILL.md"), "---\nname: alpha\n---\nv2\n");
   const moved = await source.upstream(alpha);
   expect(moved.outdated).toBe(true);
-  expect(moved.revision).toEqual({ mode: "auto" });
+  expect(moved.revision).toEqual({ track: "auto" });
   expect((await source.upstream(beta)).outdated).toBe(false);
 });
 

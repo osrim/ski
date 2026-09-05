@@ -6,11 +6,11 @@ import { discoverIn, type DiscoveredSkill } from "./discover.ts";
 import { git } from "./git.ts";
 import { integrityOf } from "../skill/integrity.ts";
 import type { Revision } from "./revision.ts";
-import type { InstalledSkill } from "../install/placement.ts";
+import type { InstalledSkill } from "../install/destination.ts";
 import type { Scope } from "../paths.ts";
 import { localSourceId, LOCAL_PREFIX, type Changes, type Upstream, type Source } from "./index.ts";
 
-const NO_REVISION: Revision = { mode: "auto" };
+const NO_REVISION: Revision = { track: "auto" };
 
 export class LocalSource implements Source {
   readonly kind = "local" as const;

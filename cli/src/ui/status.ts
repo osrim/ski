@@ -69,24 +69,24 @@ export const reportVerdicts = (
       case "outdated":
         outdated.push(verdict);
         break;
-      case "current":
+      case "up-to-date":
         break;
     }
   }
   return { moved, outdated };
 };
 
-const describeAhead = (status: OutdatedVerdict): string =>
-  status.ahead > 0 ? `${status.ahead} new commit(s)` : "content changed";
+const describeAhead = (verdict: OutdatedVerdict): string =>
+  verdict.ahead > 0 ? `${verdict.ahead} new commit(s)` : "content changed";
 
-export const describeOutdated = (status: OutdatedVerdict): string => {
-  const range = revisionRange(status);
-  return range ? `${describeAhead(status)} (${range})` : describeAhead(status);
+export const describeOutdated = (verdict: OutdatedVerdict): string => {
+  const range = revisionRange(verdict);
+  return range ? `${describeAhead(verdict)} (${range})` : describeAhead(verdict);
 };
 
-export const revisionRange = (status: OutdatedVerdict): string => {
-  const to = displayLabel(status.upstream);
-  return to ? `${displayLabel(status.skill)} → ${to}` : "";
+export const revisionRange = (verdict: OutdatedVerdict): string => {
+  const to = displayLabel(verdict.upstream);
+  return to ? `${displayLabel(verdict.skill)} → ${to}` : "";
 };
 
 export const friendlySource = (source: string): string =>
@@ -97,8 +97,8 @@ export const friendlySource = (source: string): string =>
 
 export const groupLabel = (source: string, items: OutdatedVerdict[]): string => {
   const name = bold(friendlySource(source));
-  const oldTags = new Set(items.map((status) => displayLabel(status.skill)));
-  const newTags = new Set(items.map((status) => displayLabel(status.upstream)));
+  const oldTags = new Set(items.map((verdict) => displayLabel(verdict.skill)));
+  const newTags = new Set(items.map((verdict) => displayLabel(verdict.upstream)));
   if (oldTags.size !== 1 || newTags.size !== 1) return name;
   const [oldTag] = oldTags;
   const [newTag] = newTags;

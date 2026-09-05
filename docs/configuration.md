@@ -25,15 +25,15 @@ An agent is a tool that loads skills. `ski` writes a relative symlink from the a
 | `opencode` | `.opencode/skills` | `$XDG_CONFIG_HOME/opencode/skills` or `~/.config/opencode/skills` |
 | `universal` | `.agents/skills` | `~/.agents/skills` |
 
-Without `--agent`, `ski` asks which agents to target and preselects the ones whose directories already exist. Without a terminal it uses the saved choice, else the detected agents, else `claude`.
+Without `--agent`, `ski` asks which agents to install to and preselects the ones whose directories already exist. Without a terminal it uses the remembered choice, else the detected agents, else `claude`.
 
 Editing a linked skill changes it for every linked agent.
 
-In project scope, `.ski/.gitignore` keeps the skill directories out of Git. Commit `ski-lock.json`. Copies made with `--copy` can be committed.
+In project scope, `.ski/.gitignore` keeps the skill directories out of Git. Links in the agents' skills directories are hidden with `.git/info/exclude`, in a block that `ski` rebuilds after every write. Commit `ski-lock.json`. Copies made with `--copy` can be committed.
 
-## Saved choices
+## Remembered choices
 
-When you pick a scope or agents in a prompt, or pass `-g`, `-p`, or `--agent`, `ski` saves the choice in `config.json` and preselects it next time. A new choice replaces the saved one. A config file that fails to parse is ignored.
+When you pick a scope or agents in a prompt, or pass `-g`, `-p`, or `--agent`, `ski` remembers the choice in `config.json` and preselects it next time. A new choice replaces the remembered one. A config file that fails to parse is ignored.
 
 ```json
 {
@@ -58,7 +58,7 @@ When you pick a scope or agents in a prompt, or pass `-g`, `-p`, or `--agent`, `
 
 Every path variable, including `HOME` and `CLAUDE_HOME`, must be an absolute path. `~` is not expanded.
 
-The store is a download cache. A lockfile row installs without the network when the store holds its content, and every installed skill keeps working if you delete the store.
+The store is a download cache. A lockfile entry installs without the network when the store holds its content, and every installed skill keeps working if you delete the store.
 
 ## Lockfile
 
@@ -74,7 +74,7 @@ The store is a download cache. A lockfile row installs without the network when 
       "path": "skills/pdf",
       "commit": "474e3e791559398762c4f5eff1399efe8f402156",
       "integrity": "sha256-Y7e8N/hx+rfGdAq0eQxb/7nXc6OLzBdbqVICpPivokY=",
-      "mode": "auto"
+      "track": "auto"
     }
   }
 }
@@ -85,13 +85,13 @@ The store is a download cache. A lockfile row installs without the network when 
 | `source` | Git URL or local path of the source. |
 | `path` | Skill directory inside the source. |
 | `integrity` | sha256 of the installed skill files. `install` verifies every file against it. |
-| `mode` | `auto` follows the latest stable tag or the branch. `pin` stays at the ref you typed. |
+| `track` | `auto` follows the latest stable tag or the branch. `pin` stays at the ref you typed. |
 | `commit` | Installed commit. Absent for local sources. |
 | `branch` | Default branch of the source, or the branch you pinned. Absent for local sources. |
 | `tag` | Installed tag. |
 | `pinnedAs` | The ref you typed after `@`, when it is not a branch or commit. |
 | `copy` | `true` when the skill was added with `--copy`. |
-| `agents` | Agents that received a copy. Link rows do not record agents. |
+| `agents` | Agents that received a copy. Link entries do not record agents. |
 
 ## Environment variables
 

@@ -66,7 +66,9 @@ const fileFlags: Scanner = ({ files }) => {
         finding("symlink", {
           severity: escapes ? "critical" : "warn",
           file: file.path,
-          detail: escapes ? `symlink escapes the skill dir (→ ${target})` : `symlink → ${target}`,
+          detail: escapes
+            ? `symlink escapes the skill directory (→ ${target})`
+            : `symlink → ${target}`,
         }),
       );
       continue;

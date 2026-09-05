@@ -1,5 +1,5 @@
 import { defaultAgents, type AgentId } from "./agents.ts";
-import type { ApplyTarget } from "./apply.ts";
+import type { Destination } from "./apply.ts";
 import { canonicalPath, copyState, dirModified, linkedAgents, occupiedAgents } from "./link.ts";
 import type { LockEntry, Lockfile } from "./lockfile.ts";
 import type { Scope } from "../paths.ts";
@@ -9,31 +9,30 @@ export type InstalledSkill = LockEntry & { name: string };
 export const installedSkills = (lock: Lockfile): InstalledSkill[] =>
   Object.entries(lock.skills).map(([name, entry]) => Object.assign({ name }, entry));
 
-export interface Placement {
-  form: "link" | "copy";
+export type Mode = "link" | "copy";
+
+export interface Location {
+  mode: Mode;
   agents: AgentId[];
 }
 
-export const placementOf = async (skill: InstalledSkill, scope: Scope): Promise<Placement> => {
+export const locationOf = async (skill: InstalledSkill, scope: Scope): Promise<Location> => {
   if (skill.agents) {
     const named = skill.agents;
     const agents = occupiedAgents(skill.name, scope).filter((agent) => named.includes(agent));
-    return { form: "copy", agents };
+    return { mode: "copy", agents };
   }
-  return { form: "link", agents: await linkedAgents(skill.name, scope) };
+  return { mode: "link", agents: await linkedAgents(skill.name, scope) };
 };
 
-export const placements = async (
+export const locationsOf = async (
   skills: InstalledSkill[],
   scope: Scope,
-): Promise<Map<string, Placement>> =>
+): Promise<Map<string, Location>> =>
   new Map(
     await Promise.all(
       skills.map(
-        async (skill): Promise<[string, Placement]> => [
-          skill.name,
-          await placementOf(skill, scope),
-        ],
+        async (skill): Promise<[string, Location]> => [skill.name, await locationOf(skill, scope)],
       ),
     ),
   );
@@ -43,7 +42,7 @@ export const lackingAgents = async (
   scope: Scope,
   chosen: AgentId[],
 ): Promise<AgentId[]> => {
-  const { agents } = await placementOf(skill, scope);
+  const { agents } = await locationOf(skill, scope);
   return chosen.filter((agent) => !agents.includes(agent));
 };
 
@@ -62,35 +61,35 @@ export const modifiedSkills = async (
   return new Set(hits.filter((name): name is string => name !== null));
 };
 
-export const addPlacement = (
-  row: LockEntry | undefined,
+export const addDestination = (
+  entry: LockEntry | undefined,
   dest: { scope: Scope; agents: AgentId[]; lock: Lockfile; copy: boolean },
-): ApplyTarget => {
+): Destination => {
   const { scope, agents, lock } = dest;
-  const copy = row ? row.agents !== undefined : dest.copy;
-  if (copy) return { scope, agents, lock, copy: { managed: row?.agents ?? [] } };
+  const copy = entry ? entry.agents !== undefined : dest.copy;
+  if (copy) return { scope, agents, lock, copy: { managed: entry?.agents ?? [] } };
   return { scope, agents, lock };
 };
 
-export const updatePlacement = async (
+export const updateDestination = async (
   skill: InstalledSkill,
   scope: Scope,
   lock: Lockfile,
-): Promise<{ target: ApplyTarget; defaulted: boolean }> => {
+): Promise<{ destination: Destination; defaulted: boolean }> => {
   if (skill.agents) {
     const managed = skill.agents;
-    return { target: { scope, agents: managed, lock, copy: { managed } }, defaulted: false };
+    return { destination: { scope, agents: managed, lock, copy: { managed } }, defaulted: false };
   }
   const linked = await linkedAgents(skill.name, scope);
-  if (linked.length > 0) return { target: { scope, agents: linked, lock }, defaulted: false };
-  return { target: { scope, agents: defaultAgents(), lock }, defaulted: true };
+  if (linked.length > 0) return { destination: { scope, agents: linked, lock }, defaulted: false };
+  return { destination: { scope, agents: defaultAgents(), lock }, defaulted: true };
 };
 
-export const installPlacement = async (
+export const installDestination = async (
   skill: InstalledSkill,
   scope: Scope,
   chosen: AgentId[],
-): Promise<ApplyTarget> => {
+): Promise<Destination> => {
   if (!skill.agents) return { scope, agents: chosen };
   const state = await copyState(skill.name, skill.integrity, scope, skill.agents);
   return { scope, agents: [...state.missing, ...state.modified], copy: { managed: skill.agents } };

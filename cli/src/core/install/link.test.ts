@@ -223,7 +223,7 @@ test("copySkill writes a real dir, not a link, and linkedAgents does not claim i
   expect(await linkedAgents("copied", "global")).toEqual([]);
 });
 
-test("copySkill refuses a foreign dir, replaces a managed one in place", async () => {
+test("copySkill refuses a unmanaged dir, replaces a managed one in place", async () => {
   const target = skillPath("copied", "global", "opencode");
   await writeFile(join(target, "notes.md"), "mine\n");
   await expect(copySkill("copied", files, "global", "opencode", false)).rejects.toThrow(
@@ -236,7 +236,7 @@ test("copySkill refuses a foreign dir, replaces a managed one in place", async (
   expect(await readFile(join(target, "SKILL.md"), "utf8")).toBe("hello\n");
 });
 
-test("unlinkSkill removes links but refuses foreign dirs; removeCanonical drops the copy", async () => {
+test("unlinkSkill removes links but refuses unmanaged dirs; removeCanonical drops the copy", async () => {
   for (const agent of ["claude", "opencode", "universal"] as const) {
     await unlinkSkill("demo", "global", agent);
     expect(existsSync(skillPath("demo", "global", agent))).toBe(false);
@@ -337,10 +337,10 @@ test("assertSkillsDirSafe rejects a project skills dir symlinked into a global a
     await symlink(join(opencodeGlobal, "nested"), join(dir, ".opencode", "skills"));
     await symlink(elsewhere, join(dir, ".agents", "skills"));
     await expect(assertSkillsDirSafe("project", "claude")).rejects.toThrow(
-      `is a symlink into a global skills dir (${await realpath(claudeGlobal)}).\nRemove it and re-run.`,
+      `is a symlink into a global skills directory (${await realpath(claudeGlobal)}).\nRemove it and re-run.`,
     );
     await expect(assertSkillsDirSafe("project", "opencode")).rejects.toThrow(
-      "symlink into a global skills dir",
+      "symlink into a global skills directory",
     );
     expect(await assertSkillsDirSafe("project", "universal")).toBe(
       skillsDir("project", "universal"),

@@ -3,8 +3,8 @@ import { mkdtemp, mkdir, rm, writeFile, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { $ } from "bun";
-import type { InstalledSkill } from "../install/placement.ts";
-import { computeStatus, selectUpdates, type OutdatedVerdict } from "./upstream.ts";
+import type { InstalledSkill } from "../install/destination.ts";
+import { computeVerdicts, selectUpdates, type OutdatedVerdict } from "./upstream.ts";
 import { integrityOf } from "../skill/integrity.ts";
 import { ensureClone } from "./git.ts";
 import { storeEntryPath } from "../install/store.ts";
@@ -50,7 +50,7 @@ beforeAll(async () => {
     path: "skills/demo",
     commit: v1,
     integrity: integrityOf(files),
-    mode: "auto",
+    track: "auto",
   };
 
   await writeFile(join(upstream, "skills", "demo", "SKILL.md"), "v2\n");
@@ -64,16 +64,16 @@ afterAll(async () => {
   await rm(tmp, { recursive: true, force: true });
 });
 
-test("computeStatus detects upstream changes", async () => {
-  const [status] = await computeStatus([skill]);
-  expect(status!.kind).toBe("outdated");
-  expect(status!.upstream.commit).toBe(v2);
-  expect(status!.ahead).toBe(1);
+test("computeVerdicts detects upstream changes", async () => {
+  const [verdict] = await computeVerdicts([skill]);
+  expect(verdict!.kind).toBe("outdated");
+  expect(verdict!.upstream.commit).toBe(v2);
+  expect(verdict!.ahead).toBe(1);
 });
 
 test("the diff describes the update", async () => {
-  const [status] = await computeStatus([skill]);
-  const changes = await status!.source.changes(
+  const [verdict] = await computeVerdicts([skill]);
+  const changes = await verdict!.source.changes(
     skill,
     v2,
     storeEntryPath(skill.source, skill.name, skill.integrity),
@@ -83,8 +83,8 @@ test("the diff describes the update", async () => {
 });
 
 test("update through the pipeline = new store entry + new canonical copy; the old entry survives", async () => {
-  const [status] = await computeStatus([skill]);
-  const source = status!.source;
+  const [verdict] = await computeVerdicts([skill]);
+  const source = verdict!.source;
   const lock = emptyLock();
 
   await applySkill(
@@ -92,7 +92,7 @@ test("update through the pipeline = new store entry + new canonical copy; the ol
       name: skill.name,
       source: skill.source,
       path: skill.path,
-      revision: { commit: v1, branch: "main", mode: "auto" },
+      revision: { commit: v1, branch: "main", track: "auto" },
       files: () => source.fetchFiles(v1, skill.path),
     },
     { scope: "global", agents: ["claude"], lock },
@@ -107,7 +107,7 @@ test("update through the pipeline = new store entry + new canonical copy; the ol
       name: skill.name,
       source: skill.source,
       path: skill.path,
-      revision: status!.upstream,
+      revision: verdict!.upstream,
       files: () => Promise.resolve(newFiles),
     },
     { scope: "global", agents: ["claude"], lock },
@@ -124,64 +124,64 @@ test("update through the pipeline = new store entry + new canonical copy; the ol
   expect(await readFile(join(oldEntry, "extra.md"), "utf8")).toBe("extra\n");
 });
 
-test("status is clean once the commit matches head", async () => {
-  const [status] = await computeStatus([{ ...skill, commit: v2 }]);
-  expect(status!.kind).toBe("current");
+test("verdict is clean once the commit matches head", async () => {
+  const [verdict] = await computeVerdicts([{ ...skill, commit: v2 }]);
+  expect(verdict!.kind).toBe("up-to-date");
 });
 
 test("gone: upstream removed the skill's path", async () => {
-  const [status] = await computeStatus([{ ...skill, path: "skills/removed" }]);
-  expect(status!.kind).toBe("gone");
+  const [verdict] = await computeVerdicts([{ ...skill, path: "skills/removed" }]);
+  expect(verdict!.kind).toBe("gone");
 });
 
 test("an unreachable upstream does not take down the batch", async () => {
   const dead: InstalledSkill = { ...skill, name: "dead", source: join(tmp, "gone") };
-  const [good, bad] = await computeStatus([{ ...skill, commit: v2 }, dead]);
-  expect(good!.kind).toBe("current");
+  const [good, bad] = await computeVerdicts([{ ...skill, commit: v2 }, dead]);
+  expect(good!.kind).toBe("up-to-date");
   expect(bad).toMatchObject({
     kind: "unreachable",
     error: expect.stringContaining("cannot reach"),
   });
 });
 
-test("a git row missing its commit or branch is an error, not a crash", async () => {
+test("a git entry missing its commit or branch is an error, not a crash", async () => {
   const { commit: _c, ...noCommit } = skill;
   const { branch: _b, ...noBranch } = skill;
-  const [a, b] = await computeStatus([noCommit, noBranch]);
+  const [a, b] = await computeVerdicts([noCommit, noBranch]);
   expect(a).toMatchObject({ kind: "unreachable", error: expect.stringContaining("no commit") });
   expect(b).toMatchObject({ kind: "unreachable", error: expect.stringContaining("no branch") });
 });
 
-test("auto mode tracks the latest semver tag, not branch HEAD", async () => {
+test("track auto tracks the latest semver tag, not branch HEAD", async () => {
   const clone = await ensureClone(upstream);
 
   await $`git -C ${upstream} -c tag.gpgSign=false -c tag.forceSignAnnotated=false tag v0.1.0 ${v1}`.quiet();
   await $`git -C ${clone} fetch --quiet --prune --tags --force origin`.quiet();
-  let [status] = await computeStatus([skill]);
-  expect(status!.upstream.commit).toBe(v1);
-  expect(status!.upstream.tag).toBe("v0.1.0");
-  expect(status!.kind).toBe("current");
+  let [verdict] = await computeVerdicts([skill]);
+  expect(verdict!.upstream.commit).toBe(v1);
+  expect(verdict!.upstream.tag).toBe("v0.1.0");
+  expect(verdict!.kind).toBe("up-to-date");
 
   await $`git -C ${upstream} -c tag.gpgSign=false -c tag.forceSignAnnotated=false tag v0.2.0 ${v2}`.quiet();
   await $`git -C ${clone} fetch --quiet --prune --tags --force origin`.quiet();
-  [status] = await computeStatus([skill]);
-  expect(status!.upstream.commit).toBe(v2);
-  expect(status!.upstream.tag).toBe("v0.2.0");
-  expect(status!.kind).toBe("outdated");
+  [verdict] = await computeVerdicts([skill]);
+  expect(verdict!.upstream.commit).toBe(v2);
+  expect(verdict!.upstream.tag).toBe("v0.2.0");
+  expect(verdict!.kind).toBe("outdated");
 });
 
 test("a pinned skill needs a name", async () => {
-  const pinned = { ...skill, mode: "pin" as const, pinnedAs: "pinned-tag" };
-  const [held] = await computeStatus([pinned]);
-  const [named] = await computeStatus([pinned], [skill.name]);
+  const pinned = { ...skill, track: "pin" as const, pinnedAs: "pinned-tag" };
+  const [held] = await computeVerdicts([pinned]);
+  const [named] = await computeVerdicts([pinned], [skill.name]);
   expect(held!.kind).toBe("pinned");
   expect(named!.kind).toBe("outdated");
 });
 
 test("a rewritten pinned tag never auto-updates", async () => {
   await $`git -C ${upstream} -c tag.gpgSign=false -c tag.forceSignAnnotated=false tag -f pinned-tag ${v2}`.quiet();
-  const pinned = { ...skill, mode: "pin" as const, pinnedAs: "pinned-tag" };
-  const [verdict] = await computeStatus([pinned], [skill.name]);
+  const pinned = { ...skill, track: "pin" as const, pinnedAs: "pinned-tag" };
+  const [verdict] = await computeVerdicts([pinned], [skill.name]);
   expect(verdict).toMatchObject({
     kind: "rewritten",
     pinnedAs: "pinned-tag",
@@ -194,7 +194,7 @@ test("moved without outdated is a bump", async () => {
   await writeFile(join(upstream, "README.md"), "release-only\n");
   const v3 = await commitAll("release-only");
   await $`git -C ${upstream} -c tag.gpgSign=false -c tag.forceSignAnnotated=false tag v0.3.0 ${v3}`.quiet();
-  const [verdict] = await computeStatus([{ ...skill, commit: v2 }]);
+  const [verdict] = await computeVerdicts([{ ...skill, commit: v2 }]);
   expect(verdict!.kind).toBe("moved");
 });
 
@@ -203,8 +203,8 @@ test("a rewritten pinned ref wins over a removed skill", async () => {
   const v4 = await commitAll("removed");
   await $`git -C ${upstream} -c tag.gpgSign=false -c tag.forceSignAnnotated=false tag v0.4.0 ${v4}`.quiet();
   await $`git -C ${upstream} -c tag.gpgSign=false -c tag.forceSignAnnotated=false tag -f pinned-tag ${v4}`.quiet();
-  const pinned = { ...skill, mode: "pin" as const, pinnedAs: "pinned-tag" };
-  const [verdict] = await computeStatus([pinned]);
+  const pinned = { ...skill, track: "pin" as const, pinnedAs: "pinned-tag" };
+  const [verdict] = await computeVerdicts([pinned]);
   expect(verdict).toMatchObject({ kind: "rewritten", expected: v1, actual: v4 });
 });
 
@@ -217,10 +217,10 @@ const outdatedStatus = (name: string): OutdatedVerdict => ({
     path: `skills/${name}`,
     commit: "a".repeat(40),
     integrity: "sha256-qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqo=",
-    mode: "auto",
+    track: "auto",
   },
   source: sourceFor("r"),
-  upstream: { commit: "b".repeat(40), branch: "main", mode: "auto" as const },
+  upstream: { commit: "b".repeat(40), branch: "main", track: "auto" as const },
   ahead: 1,
 });
 

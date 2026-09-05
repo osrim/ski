@@ -3,7 +3,7 @@ import { basename } from "node:path";
 import type { AgentId } from "../core/install/agents.ts";
 import { selector, type DiscoveredSkill } from "../core/source/discover.ts";
 import { occupiedAgents } from "../core/install/link.ts";
-import { lackingAgents, type Placement } from "../core/install/placement.ts";
+import { lackingAgents, type Location } from "../core/install/destination.ts";
 import { nearest } from "../core/suggest.ts";
 import { isApproved, type Lockfile } from "../core/install/lockfile.ts";
 import { integrityOf } from "../core/skill/integrity.ts";
@@ -109,7 +109,7 @@ const unmanagedMark = (
   agents: AgentId[],
 ): string | undefined => {
   const where = occupiedAgents(skill.name, scope).filter((agent) => agents.includes(agent));
-  return where.length === 0 ? undefined : `existing entry in ${where.join(", ")}`;
+  return where.length === 0 ? undefined : `unmanaged in ${where.join(", ")}`;
 };
 
 const offerableRow = (skill: DiscoveredSkill, scope: Scope, agents: AgentId[]): PickerRow => {
@@ -193,8 +193,8 @@ const approvedMissingAgentsByPath = async (
 ): Promise<Map<string, AgentId[]>> => {
   const { skills, lock, scope, agents, source, rev } = selection;
   const candidates = skills.filter((skill) => {
-    const row = lock.skills[skill.name];
-    return row !== undefined && row.source === source.id && row.path === skill.path;
+    const entry = lock.skills[skill.name];
+    return entry !== undefined && entry.source === source.id && entry.path === skill.path;
   });
   if (candidates.length === 0) return new Map();
   const pairs = await withSpinner(
@@ -216,8 +216,8 @@ const approvedMissingAgentsByPath = async (
     if (!isApproved(lock, skill.name, { source: source.id, path: skill.path, integrity })) {
       continue;
     }
-    const row = lock.skills[skill.name]!;
-    lacking.set(skill.path, await lackingAgents({ name: skill.name, ...row }, scope, agents));
+    const entry = lock.skills[skill.name]!;
+    lacking.set(skill.path, await lackingAgents({ name: skill.name, ...entry }, scope, agents));
   }
   return lacking;
 };
@@ -305,11 +305,11 @@ export const pickUpdates = async (updatable: OutdatedVerdict[]): Promise<string[
   requireTTY("ski update needs to know which skills", SELECTION_REMEDY);
   const groups = groupOptionsBySource(
     updatable,
-    (status) => status.skill.source,
+    (verdict) => verdict.skill.source,
     groupLabel,
-    (status) => ({
-      value: status.skill.name,
-      label: `${skillName(status.skill.name)}: ${describeOutdated(status)}`,
+    (verdict) => ({
+      value: verdict.skill.name,
+      label: `${skillName(verdict.skill.name)}: ${describeOutdated(verdict)}`,
     }),
   );
   return unwrap(
@@ -324,7 +324,7 @@ export const pickUpdates = async (updatable: OutdatedVerdict[]): Promise<string[
 export const pickToRemove = async (
   installed: string[],
   lock: Lockfile,
-  held: Map<string, Placement>,
+  locations: Map<string, Location>,
 ): Promise<string[]> => {
   requireTTY("ski remove needs to know which skills", SELECTION_REMEDY);
   const groups = groupOptionsBySource(
@@ -332,10 +332,10 @@ export const pickToRemove = async (
     (name) => friendlySource(lock.skills[name]!.source),
     (source, rows) => `${source} (${rows.length} skill(s))`,
     (name) => {
-      const where = held.get(name)!.agents;
+      const where = locations.get(name)!.agents;
       return {
         value: name,
-        label: `${skillName(name)}: ${displayLabel(lock.skills[name]!)} ${where.length > 0 ? `[${where.join(", ")}]` : "[not linked]"}`,
+        label: `${skillName(name)}: ${displayLabel(lock.skills[name]!)} ${where.length > 0 ? `[${where.join(", ")}]` : "[missing]"}`,
       };
     },
   );

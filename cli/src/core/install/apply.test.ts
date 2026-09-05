@@ -29,7 +29,7 @@ let prevHome: string | undefined;
 const files: SkillFile[] = [{ path: "SKILL.md", content: Buffer.from("hello\n"), mode: "100644" }];
 const integrity = integrityOf(files);
 const lazy = (): Promise<SkillFile[]> => Promise.resolve(files);
-const revision: Revision = { commit: "a".repeat(40), branch: "main", mode: "auto", tag: "v1.0.0" };
+const revision: Revision = { commit: "a".repeat(40), branch: "main", track: "auto", tag: "v1.0.0" };
 
 beforeAll(async () => {
   tmp = await mkdtemp(join(tmpdir(), "ski-apply-test-"));
@@ -51,7 +51,7 @@ const linksTo = async (name: string, agent: AgentId): Promise<boolean> => {
   return (await realpath(target)) === (await realpath(canonicalPath(name, "global")));
 };
 
-test("applySkill caches, writes the canonical copy, links relatively, and records the row", async () => {
+test("applySkill caches, writes the canonical copy, links relatively, and records the entry", async () => {
   const lock = emptyLock();
   await applySkill(
     { name: "demo", source: "https://github.com/o/r", path: "skills/demo", revision, files: lazy },
@@ -62,7 +62,7 @@ test("applySkill caches, writes the canonical copy, links relatively, and record
   expect(entry.path).toBe("skills/demo");
   expect(entry.commit).toBe(revision.commit);
   expect(entry.integrity).toBe(integrity);
-  expect(entry.mode).toBe("auto");
+  expect(entry.track).toBe("auto");
   expect(entry.tag).toBe("v1.0.0");
   expect(existsSync(storeEntryPath("https://github.com/o/r", "demo", integrity))).toBe(true);
   expect((await lstat(canonicalPath("demo", "global"))).isDirectory()).toBe(true);
@@ -81,13 +81,13 @@ test("a skill survives the store being deleted", async () => {
 test("a local revision records neither commit nor branch", async () => {
   const lock = emptyLock();
   await applySkill(
-    { name: "loc", source: "local:/x", path: "", revision: { mode: "auto" }, files: lazy },
+    { name: "loc", source: "local:/x", path: "", revision: { track: "auto" }, files: lazy },
     { scope: "global", agents: ["claude"], lock },
   );
   expect(lock.skills["loc"]).toEqual({
     source: "local:/x",
     path: "",
-    mode: "auto",
+    track: "auto",
     integrity,
   });
   expect("commit" in lock.skills["loc"]!).toBe(false);
@@ -152,7 +152,7 @@ test("fetched content that does not match the integrity never enters the store",
 
 test("applySkill links every target agent to one canonical copy", async () => {
   const lock = emptyLock();
-  const rev: Revision = { commit: "d".repeat(40), branch: "main", mode: "auto" };
+  const rev: Revision = { commit: "d".repeat(40), branch: "main", track: "auto" };
   await applySkill(
     { name: "multi", source: "https://github.com/o/r", path: "", revision: rev, files: lazy },
     { scope: "global", agents: ["claude", "opencode", "universal"], lock },
@@ -164,8 +164,8 @@ test("applySkill links every target agent to one canonical copy", async () => {
   expect(Object.keys(lock.skills)).toEqual(["multi"]);
 });
 
-test("a foreign agent entry fails the skill and stays in place", async () => {
-  const rev: Revision = { commit: "e".repeat(40), branch: "main", mode: "auto" };
+test("a unmanaged agent entry fails the skill and stays in place", async () => {
+  const rev: Revision = { commit: "e".repeat(40), branch: "main", track: "auto" };
   for (const agent of ["claude", "universal"] as const) {
     const target = skillPath("hand-written", "global", agent);
     await mkdir(target, { recursive: true });
@@ -231,7 +231,7 @@ test("applySkill enforces dest-safety on every path (the old update gap)", async
 
 test("the copy form writes a directory per agent, not a link, and records where", async () => {
   const lock = emptyLock();
-  const rev: Revision = { commit: "f".repeat(40), branch: "main", mode: "auto" };
+  const rev: Revision = { commit: "f".repeat(40), branch: "main", track: "auto" };
   await applySkill(
     { name: "copied", source: "https://github.com/o/r", path: "", revision: rev, files: lazy },
     { scope: "global", agents: ["claude", "opencode"], lock, copy: { managed: [] } },
@@ -253,7 +253,7 @@ test("the copy form writes a directory per agent, not a link, and records where"
   });
 });
 
-test("a copy replaces managed directories and refuses a foreign one", async () => {
+test("a copy replaces managed directories and refuses a unmanaged one", async () => {
   const other: SkillFile[] = [{ path: "SKILL.md", content: Buffer.from("v2\n"), mode: "100644" }];
   await writeFile(join(skillPath("copied", "global", "claude"), "SKILL.md"), "edited\n");
   await mkdir(skillPath("copied", "global", "universal"), { recursive: true });
@@ -319,9 +319,9 @@ test("copyState tells a missing directory from a modified one", async () => {
   });
 });
 
-test("a copy row keeps naming the managed agents this write did not touch", async () => {
+test("a copy entry keeps naming the managed agents this write did not touch", async () => {
   const lock = emptyLock();
-  const rev: Revision = { commit: "e".repeat(40), branch: "main", mode: "auto" };
+  const rev: Revision = { commit: "e".repeat(40), branch: "main", track: "auto" };
   await applySkill(
     { name: "kept", source: "https://github.com/o/r", path: "", revision: rev, files: lazy },
     { scope: "global", agents: ["universal"], lock, copy: { managed: ["claude"] } },

@@ -19,7 +19,7 @@ const asBatch = (selected: SkillFiles[]): BatchSkill[] =>
 const warnMentions = (missing: MissingDep[], note: string): void => {
   for (const dep of missing) {
     warn(
-      `${skillName(dep.from)} references ${skillName(dep.name)} at ${dep.file}:${dep.line}. ${note}.`,
+      `${skillName(dep.from)} mentions ${skillName(dep.name)} at ${dep.file}:${dep.line}. ${note}.`,
     );
   }
 };
@@ -79,7 +79,7 @@ export const resolveDeps = async (
             return {
               value: dep.name,
               label: dep.name,
-              hint: summarize(skill.description) ?? `referenced by ${dep.from}`,
+              hint: summarize(skill.description) ?? `mentioned by ${dep.from}`,
             };
           }),
           required: false,
@@ -108,23 +108,23 @@ export const resolveDeps = async (
 };
 
 export interface UpdatedFiles {
-  status: OutdatedVerdict;
+  verdict: OutdatedVerdict;
   files: SkillFile[];
 }
 
-const discoveryKey = (status: OutdatedVerdict): string =>
-  status.source.kind === "local"
-    ? status.skill.source
-    : `${status.skill.source}@${status.upstream.commit}`;
+const discoveryKey = (verdict: OutdatedVerdict): string =>
+  verdict.source.kind === "local"
+    ? verdict.skill.source
+    : `${verdict.skill.source}@${verdict.upstream.commit}`;
 
 export const reportUpdateDeps = async (
   updated: UpdatedFiles[],
   lock: Lockfile,
   scope: Scope,
 ): Promise<void> => {
-  const groups = Map.groupBy(updated, (item) => discoveryKey(item.status));
+  const groups = Map.groupBy(updated, (item) => discoveryKey(item.verdict));
   for (const group of groups.values()) {
-    const { source, upstream, skill } = group[0]!.status;
+    const { source, upstream, skill } = group[0]!.verdict;
     let known: DiscoveredSkill[];
     try {
       known = await withSpinner(
@@ -137,7 +137,7 @@ export const reportUpdateDeps = async (
       continue;
     }
     const missing = missingDeps(
-      group.map((item) => ({ name: item.status.skill.name, files: item.files })),
+      group.map((item) => ({ name: item.verdict.skill.name, files: item.files })),
       known.map((candidate) => candidate.name),
       (name) => lock.skills[name] !== undefined,
     );

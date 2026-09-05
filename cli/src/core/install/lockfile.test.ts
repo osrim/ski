@@ -36,14 +36,14 @@ const entry = {
   path: "skills/tdd",
   commit: "a".repeat(40),
   integrity,
-  mode: "auto" as const,
+  track: "auto" as const,
 };
 
 const local = {
   source: "local:./skills/mine",
   path: "",
   integrity,
-  mode: "auto" as const,
+  track: "auto" as const,
 };
 
 const inDir = async <T>(dir: string, fn: () => T | Promise<T>): Promise<T> => {
@@ -60,12 +60,12 @@ test("missing lockfile reads as empty", async () => {
   expect(await readLock("global")).toEqual(emptyLock());
 });
 
-test("roundtrip preserves entries; entries are sorted by name; keys in row order", async () => {
+test("roundtrip preserves entries; entries are sorted by name; keys in entry order", async () => {
   const lock: Lockfile = {
     lockfileVersion: 1,
     skills: {
       zeta: { ...entry, tag: "v1.2.0" },
-      alpha: { ...entry, mode: "pin", pinnedAs: "v1" },
+      alpha: { ...entry, track: "pin", pinnedAs: "v1" },
       bare: { ...entry, path: "" },
       mine: local,
     },
@@ -83,7 +83,7 @@ test("roundtrip preserves entries; entries are sorted by name; keys in row order
         path: "skills/tdd",
         commit: entry.commit,
         integrity,
-        mode: "pin",
+        track: "pin",
         pinnedAs: "v1",
       },
       bare: {
@@ -92,13 +92,13 @@ test("roundtrip preserves entries; entries are sorted by name; keys in row order
         path: "",
         commit: entry.commit,
         integrity,
-        mode: "auto",
+        track: "auto",
       },
       mine: {
         source: "local:./skills/mine",
         path: "",
         integrity,
-        mode: "auto",
+        track: "auto",
       },
       zeta: {
         source: entry.source,
@@ -106,7 +106,7 @@ test("roundtrip preserves entries; entries are sorted by name; keys in row order
         path: "skills/tdd",
         commit: entry.commit,
         integrity,
-        mode: "auto",
+        track: "auto",
         tag: "v1.2.0",
       },
     },
@@ -118,14 +118,14 @@ test("roundtrip preserves entries; entries are sorted by name; keys in row order
   const keys = Object.keys(
     (JSON.parse(raw) as { skills: Record<string, object> }).skills["alpha"]!,
   );
-  expect(keys).toEqual(["source", "branch", "path", "commit", "integrity", "mode", "pinnedAs"]);
+  expect(keys).toEqual(["source", "branch", "path", "commit", "integrity", "track", "pinnedAs"]);
   const localKeys = Object.keys(
     (JSON.parse(raw) as { skills: Record<string, object> }).skills["mine"]!,
   );
-  expect(localKeys).toEqual(["source", "path", "integrity", "mode"]);
+  expect(localKeys).toEqual(["source", "path", "integrity", "track"]);
 });
 
-test("a copy row keeps copy and agents through a round trip, in the documented key order", async () => {
+test("a copy entry keeps copy and agents through a round trip, in the documented key order", async () => {
   const copy = { ...entry, copy: true as const, agents: ["claude", "universal"] as const };
   await writeLock("global", {
     lockfileVersion: 1,
@@ -141,7 +141,7 @@ test("a copy row keeps copy and agents through a round trip, in the documented k
     "path",
     "commit",
     "integrity",
-    "mode",
+    "track",
     "copy",
     "agents",
   ]);
@@ -149,7 +149,7 @@ test("a copy row keeps copy and agents through a round trip, in the documented k
   expect(await readFile(lockPath("global"), "utf8")).not.toContain("copy");
 });
 
-test("isApproved matches only the exact (source, path, integrity) row; the commit is not part of it", () => {
+test("isApproved matches only the exact (source, path, integrity) entry; the commit is not part of it", () => {
   const lock: Lockfile = { lockfileVersion: 1, skills: { tdd: entry } };
   const at = { source: entry.source, path: entry.path, integrity };
   expect(isApproved(lock, "tdd", at)).toBe(true);
@@ -169,7 +169,7 @@ test("isApproved matches only the exact (source, path, integrity) row; the commi
   expect(isApproved(moved, "tdd", at)).toBe(true);
 });
 
-test("isApproved does not see a row from the other scope", async () => {
+test("isApproved does not see a entry from the other scope", async () => {
   const at = { source: entry.source, path: entry.path, integrity };
   await writeLock("global", { lockfileVersion: 1, skills: { tdd: entry } });
   expect(isApproved(await readLock("global"), "tdd", at)).toBe(true);
@@ -181,24 +181,24 @@ test("isApproved does not see a row from the other scope", async () => {
   });
 });
 
-test("parse errors: bad version, unparseable JSON, bad mode, missing or non-SRI integrity", () => {
+test("parse errors: bad version, unparseable JSON, bad track, missing or non-SRI integrity", () => {
   expect(() => parseLock('{"lockfileVersion":9,"skills":{}}', "f")).toThrow(
     "unsupported lockfile version 9",
   );
   expect(() => parseLock('{"skills":{}}', "f")).toThrow("unsupported lockfile version undefined");
   expect(() => parseLock("not json", "f")).toThrow("f:");
-  expect(() => parseLock('{"lockfileVersion":1,"skills":{"a":{"mode":"nope"}}}', "f")).toThrow(
-    'unknown mode "nope"',
+  expect(() => parseLock('{"lockfileVersion":1,"skills":{"a":{"track":"nope"}}}', "f")).toThrow(
+    'unknown track "nope"',
   );
   expect(() =>
     parseLock(
-      `{"lockfileVersion":1,"skills":{"a":{"source":"r","branch":"main","path":"","sha":"${"a".repeat(40)}","mode":"auto"}}}`,
+      `{"lockfileVersion":1,"skills":{"a":{"source":"r","branch":"main","path":"","sha":"${"a".repeat(40)}","track":"auto"}}}`,
       "ski-lock.json",
     ),
   ).toThrow("ski-lock.json: a: missing integrity");
   expect(() =>
     parseLock(
-      `{"lockfileVersion":1,"skills":{"a":{"source":"r","path":"","integrity":"sha256:${"f".repeat(64)}","mode":"auto"}}}`,
+      `{"lockfileVersion":1,"skills":{"a":{"source":"r","path":"","integrity":"sha256:${"f".repeat(64)}","track":"auto"}}}`,
       "ski-lock.json",
     ),
   ).toThrow("ski-lock.json: a: integrity must be sha256-<base64>");
@@ -233,7 +233,7 @@ test("projectRoot falls back to cwd when nothing is found", async () => {
 
 test("parse errors: unsafe skill names and inconsistent copy configuration", () => {
   const lock = (name: string, extra = ""): string =>
-    `{"lockfileVersion":1,"skills":{${JSON.stringify(name)}:{"source":"r","path":"","integrity":"${integrity}","mode":"auto"${extra}}}}`;
+    `{"lockfileVersion":1,"skills":{${JSON.stringify(name)}:{"source":"r","path":"","integrity":"${integrity}","track":"auto"${extra}}}}`;
   expect(() => parseLock(lock(""), "f")).toThrow('f: invalid skill name ""');
   expect(() => parseLock(lock("."), "f")).toThrow('f: invalid skill name "."');
   expect(() => parseLock(lock(".."), "f")).toThrow('f: invalid skill name ".."');
@@ -254,7 +254,7 @@ test("parse errors: unsafe skill names and inconsistent copy configuration", () 
       source: "r",
       path: "",
       integrity,
-      mode: "auto",
+      track: "auto",
       copy: true,
       agents: ["claude"],
     },
@@ -262,8 +262,8 @@ test("parse errors: unsafe skill names and inconsistent copy configuration", () 
 });
 
 test("a lockfile carrying installedAt loads without it and re-serializes without it", () => {
-  const text = `{"lockfileVersion":1,"skills":{"tdd":{"source":"r","path":"","integrity":"${integrity}","mode":"auto","installedAt":"2026-08-03T12:00:00Z"}}}`;
+  const text = `{"lockfileVersion":1,"skills":{"tdd":{"source":"r","path":"","integrity":"${integrity}","track":"auto","installedAt":"2026-08-03T12:00:00Z"}}}`;
   const parsed = parseLock(text, "ski-lock.json");
-  expect(parsed.skills["tdd"]).toEqual({ source: "r", path: "", integrity, mode: "auto" });
+  expect(parsed.skills["tdd"]).toEqual({ source: "r", path: "", integrity, track: "auto" });
   expect(serializeLock(parsed)).not.toContain("installedAt");
 });

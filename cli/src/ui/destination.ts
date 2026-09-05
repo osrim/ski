@@ -15,6 +15,7 @@ import {
   type AgentId,
 } from "../core/install/agents.ts";
 import { readConfig, remember } from "../core/config.ts";
+import type { Mode } from "../core/install/destination.ts";
 import { syncExcludes } from "../core/install/exclude.ts";
 import { projectRoot, type Scope } from "../core/paths.ts";
 import { resolveScope, type ScopeOptions } from "../core/install/scope.ts";
@@ -73,8 +74,6 @@ const VERBS = {
   },
 } as const;
 
-export type LinkVerb = keyof typeof VERBS;
-
 export const agentRows = (
   paths: string[],
   detected: AgentId[],
@@ -96,9 +95,9 @@ export const preferredAgents = (
 export const chooseAgents = async (
   options: AgentSelection,
   scope: Scope,
-  verb: LinkVerb = "link",
+  mode: Mode = "link",
 ): Promise<AgentId[]> => {
-  const { imperative, gerund, explainer } = VERBS[verb];
+  const { imperative, gerund, explainer } = VERBS[mode];
   const explicit = ((): AgentId[] | null => {
     try {
       return parseAgentFlag(options.agent);

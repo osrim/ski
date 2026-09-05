@@ -48,13 +48,13 @@ git@github.com:owner/repo.git     clone URL
 ski install [-g|-p] [-y] [--agent <id>]
 ```
 
-`install` restores every lockfile row. It takes no positional arguments; passing one exits `2`.
+`install` restores every lockfile entry. It takes no positional arguments; passing one exits `2`.
 
-`install` does not scan. `add` or `update` reviewed every row, and `install` verifies each file against the recorded integrity before writing it. A row whose content does not match is skipped and the command exits `1`.
+`install` does not scan. `add` or `update` reviewed every entry, and `install` verifies each file against the recorded integrity before writing it. An entry whose content does not match is skipped and the command exits `1`.
 
-Restoring a modified skill discards your edits, so `install` asks first. Without a terminal it keeps the edits and installs the other rows. `--yes` restores without asking.
+Restoring a modified skill discards your edits, so `install` asks first. Without a terminal it keeps the edits and installs the other entries. `--yes` restores without asking.
 
-Rows added with `--copy` install to the agents recorded in the row. Link rows install to the agents you pass with `--agent`, or to the saved or detected defaults.
+Entries added with `--copy` install to the agents recorded in the entry. Link entries install to the agents you pass with `--agent`, or to the saved or detected defaults.
 
 ## `update`
 
@@ -77,7 +77,7 @@ ski update [...skills] [-g|-p] [-a] [-y]
 ski remove [...skills] [-g|-p] [-a] [-y]
 ```
 
-`remove` deletes the selected lockfile rows and the links or copies that `ski` created. It leaves other files in agent directories alone and does not use the network.
+`remove` deletes the selected lockfile entries and the links or copies that `ski` created. It leaves other files in skills directories alone and does not use the network.
 
 Without names or `--all`, it opens a picker. `--all` selects every installed skill. `--yes` skips the confirmation.
 
@@ -87,7 +87,7 @@ Without names or `--all`, it opens a picker. `--all` selects every installed ski
 ski list [-g|-p] [--json]
 ```
 
-`list` shows every lockfile row with its revision and agents, and marks skills that are missing from an agent directory or whose files differ from the lockfile. It does not use the network.
+`list` shows every lockfile entry with its revision and agents, and marks skills that are missing from a skills directory or whose files differ from the lockfile. It does not use the network.
 
 `--json` writes one JSON object to stdout and nothing else. Diagnostics go to stderr.
 
@@ -102,7 +102,7 @@ ski list [-g|-p] [--json]
       "path": "skills/pdf",
       "commit": "474e3e791559398762c4f5eff1399efe8f402156",
       "integrity": "sha256-...",
-      "mode": "auto",
+      "track": "auto",
       "branch": "main",
       "modified": false,
       "agents": ["claude"],
@@ -120,7 +120,7 @@ Each skill carries its lockfile fields (see [configuration.md](configuration.md#
 | --- | --- | --- |
 | `-g`, `--global` | all | Use global scope. |
 | `-p`, `--project` | all | Use project scope. |
-| `--agent <id>` | `add`, `install` | Target `claude`, `opencode`, or `universal`. Repeat the flag or separate ids with commas. |
+| `--agent <id>` | `add`, `install` | Install to `claude`, `opencode`, or `universal`. Repeat the flag or separate ids with commas. |
 | `-a`, `--all` | `add`, `update`, `remove` | Select every skill. It does not confirm or approve anything. |
 | `-y`, `--yes` | `add`, `install`, `update`, `remove` | Accept ordinary confirmations and defaults. It cannot approve critical findings. |
 | `--copy` | `add` | Write directories instead of links. |

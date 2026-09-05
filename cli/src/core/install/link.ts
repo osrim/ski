@@ -43,7 +43,7 @@ export const assertSkillsDirSafe = async (scope: Scope, agent: AgentId): Promise
   const forbidden = [{ label: "the store", root: dataDir() }];
   if (scope === "project") {
     for (const def of AGENTS)
-      forbidden.push({ label: "a global skills dir", root: def.globalDir() });
+      forbidden.push({ label: "a global skills directory", root: def.globalDir() });
   }
   for (const { label, root } of forbidden) {
     if (isInside(resolved, await realpathOrNearest(root))) {
@@ -62,14 +62,14 @@ export const canonicalPath = (name: string, scope: Scope): string =>
 const isManagedLink = async (path: string, scope: Scope): Promise<boolean> => {
   if (!(await isSymlinkPath(path))) return false;
   try {
-    const target = resolve(await realpathOrNearest(dirname(path)), await readlink(path));
-    return isInside(target, await realpathOrNearest(canonicalDir(scope)));
+    const resolved = resolve(await realpathOrNearest(dirname(path)), await readlink(path));
+    return isInside(resolved, await realpathOrNearest(canonicalDir(scope)));
   } catch {
     return false;
   }
 };
 
-const isForeignEntry = async (path: string, scope: Scope): Promise<boolean> =>
+const isUnmanaged = async (path: string, scope: Scope): Promise<boolean> =>
   present(path) && !(await isManagedLink(path, scope));
 
 const displayPath = (path: string): string => {
@@ -77,15 +77,15 @@ const displayPath = (path: string): string => {
   return rel.startsWith("..") ? tildify(path) : rel;
 };
 
-export const assertNotForeign = async (
+export const refuseUnmanaged = async (
   name: string,
   scope: Scope,
   agent: AgentId,
 ): Promise<void> => {
-  const target = skillPath(name, scope, agent);
-  if (!(await isForeignEntry(target, scope))) return;
+  const path = skillPath(name, scope, agent);
+  if (!(await isUnmanaged(path, scope))) return;
   throw new Error(
-    `${displayPath(target)} exists and is not managed by ski, skipped\nMove or delete it, then re-run.`,
+    `${displayPath(path)} exists and is not managed by ski, skipped\nMove or delete it, then re-run.`,
   );
 };
 
@@ -102,15 +102,15 @@ export const occupiedAgents = (name: string, scope: Scope): AgentId[] =>
   AGENTS.filter((agent) => present(skillPath(name, scope, agent.id))).map((agent) => agent.id);
 
 export const linkSkill = async (name: string, scope: Scope, agent: AgentId): Promise<void> => {
-  const target = skillPath(name, scope, agent);
-  const dir = dirname(target);
+  const path = skillPath(name, scope, agent);
+  const dir = dirname(path);
   await mkdir(dir, { recursive: true });
-  await assertNotForeign(name, scope, agent);
-  await rm(target, { force: true });
+  await refuseUnmanaged(name, scope, agent);
+  await rm(path, { force: true });
   // Resolve both ends so the link still holds when an agent dir is itself a symlink.
   const from = await realpathOrNearest(dir);
   const to = await realpathOrNearest(canonicalPath(name, scope));
-  await symlink(relative(from, to), target);
+  await symlink(relative(from, to), path);
 };
 
 export const copySkill = async (
@@ -120,11 +120,11 @@ export const copySkill = async (
   agent: AgentId,
   managed: boolean,
 ): Promise<void> => {
-  const target = skillPath(name, scope, agent);
-  await mkdir(dirname(target), { recursive: true });
-  if (!managed) await assertNotForeign(name, scope, agent);
-  await rm(target, { recursive: true, force: true });
-  await writeFiles(target, files);
+  const path = skillPath(name, scope, agent);
+  await mkdir(dirname(path), { recursive: true });
+  if (!managed) await refuseUnmanaged(name, scope, agent);
+  await rm(path, { recursive: true, force: true });
+  await writeFiles(path, files);
 };
 
 export const removeCopy = (name: string, scope: Scope, agent: AgentId): Promise<void> =>
@@ -135,14 +135,14 @@ export const writeCanonical = async (
   files: SkillFile[],
   scope: Scope,
 ): Promise<void> => {
-  const target = canonicalPath(name, scope);
-  await mkdir(dirname(target), { recursive: true });
+  const path = canonicalPath(name, scope);
+  await mkdir(dirname(path), { recursive: true });
   if (scope === "project") {
     const ignore = join(canonicalDir(scope), "..", ".gitignore");
     if (!existsSync(ignore)) await writeFile(ignore, "*\n");
   }
-  await rm(target, { recursive: true, force: true });
-  await writeFiles(target, files);
+  await rm(path, { recursive: true, force: true });
+  await writeFiles(path, files);
 };
 
 export const removeCanonical = (name: string, scope: Scope): Promise<void> =>
@@ -164,17 +164,17 @@ export const copyState = async (
 ): Promise<CopyState> => {
   const state: CopyState = { missing: [], modified: [] };
   for (const agent of agents) {
-    const target = skillPath(name, scope, agent);
-    if (!present(target)) state.missing.push(agent);
-    else if (await dirModified(target, integrity)) state.modified.push(agent);
+    const path = skillPath(name, scope, agent);
+    if (!present(path)) state.missing.push(agent);
+    else if (await dirModified(path, integrity)) state.modified.push(agent);
   }
   return state;
 };
 
 export const unlinkSkill = async (name: string, scope: Scope, agent: AgentId): Promise<void> => {
-  const target = skillPath(name, scope, agent);
-  if (await isForeignEntry(target, scope)) {
-    throw new Error(`${displayPath(target)} is not managed by ski. Delete it yourself.`);
+  const path = skillPath(name, scope, agent);
+  if (await isUnmanaged(path, scope)) {
+    throw new Error(`${displayPath(path)} is not managed by ski. Delete it yourself.`);
   }
-  await rm(target, { recursive: true, force: true });
+  await rm(path, { recursive: true, force: true });
 };

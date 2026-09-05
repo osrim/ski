@@ -24,11 +24,11 @@ const repo = async (init = true): Promise<string> => {
 
 const files: SkillFile[] = [{ path: "SKILL.md", content: Buffer.from("x\n"), mode: "100644" }];
 
-const row = (copy = false): LockEntry => ({
+const entry = (copy = false): LockEntry => ({
   source: "https://github.com/o/r",
   path: "",
   integrity: "sha256-qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqo=",
-  mode: "auto",
+  track: "auto",
   ...(copy ? { copy: true, agents: ["claude"] } : {}),
 });
 
@@ -36,7 +36,7 @@ const link = async (name: string): Promise<void> => {
   await writeCanonical(name, files, "project");
   await linkSkill(name, "project", "claude");
   const lock = await readLock("project");
-  lock.skills[name] = row();
+  lock.skills[name] = entry();
   await writeLock("project", lock);
 };
 
@@ -114,7 +114,7 @@ test("the user's own lines survive a sync", async () => {
   expect(text).toContain(BEGIN);
 });
 
-test("only link rows are listed, never a foreign link, a copy row, or an unlocked dir", async () => {
+test("only link entries are listed, never a unmanaged link, a copy entry, or an unlocked dir", async () => {
   const root = await repo();
   await link("demo");
   const outside = join(tmp, "elsewhere");
@@ -124,7 +124,7 @@ test("only link rows are listed, never a foreign link, a copy row, or an unlocke
   await copySkill("copied", files, "project", "universal", false);
   await mkdir(join(root, ".agents", "skills", "unlocked"), { recursive: true });
   const lock = await readLock("project");
-  lock.skills["copied"] = row(true);
+  lock.skills["copied"] = entry(true);
   await writeLock("project", lock);
   expect((await syncExcludes()).patterns).toEqual([".claude/skills/demo"]);
 });

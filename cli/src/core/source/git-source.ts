@@ -12,16 +12,16 @@ import { isSkillContent, type SkillFile } from "../skill/files.ts";
 import { discoverSkills, type DiscoveredSkill } from "./discover.ts";
 import { repoName } from "./coordinate.ts";
 import { resolveRevision, resolveUpstream, type Revision } from "./revision.ts";
-import type { InstalledSkill } from "../install/placement.ts";
+import type { InstalledSkill } from "../install/destination.ts";
 import type { Scope } from "../paths.ts";
 import type { Changes, Upstream, Source } from "./index.ts";
 
 const commitOf = (skill: InstalledSkill): string => {
-  if (!skill.commit) throw new Error(`${skill.name}: lockfile row has no commit`);
+  if (!skill.commit) throw new Error(`${skill.name}: lockfile entry has no commit`);
   return skill.commit;
 };
 const branchOf = (skill: InstalledSkill): string => {
-  if (!skill.branch) throw new Error(`${skill.name}: lockfile row has no branch`);
+  if (!skill.branch) throw new Error(`${skill.name}: lockfile entry has no branch`);
   return skill.branch;
 };
 
@@ -68,14 +68,14 @@ export class GitSource implements Source {
       );
       ahead = counted.code === 0 ? Number.parseInt(counted.out || "0", 10) : 0;
     }
-    const mode = skill.mode;
+    const track = skill.track;
     return {
       revision: {
         commit: upstream.commit,
         branch,
-        mode,
+        track,
         ...(upstream.tag ? { tag: upstream.tag } : {}),
-        ...(mode === "pin" && upstream.tag ? { pinnedAs: upstream.tag } : {}),
+        ...(track === "pin" && upstream.tag ? { pinnedAs: upstream.tag } : {}),
       },
       outdated,
       moved,
