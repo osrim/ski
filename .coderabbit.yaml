@@ -1,0 +1,13 @@
+reviews:
+  profile: chill
+  high_level_summary: false
+  poem: false
+  review_status: false
+  sequence_diagrams: false
+  suggested_labels: false
+  suggested_reviewers: false
+  estimate_code_review_effort: false
+  auto_review:
+    drafts: false
+chat:
+  auto_reply: false
