@@ -1,14 +1,29 @@
 # Contributing
 
-For bugs, include the command, its output, and `ski --version`.
+Thanks for considering contributing to `ski`!
 
-## Set up
+Every kind of contribution is welcome:
+
+- Issues: bug reports, feature requests, questions, ideas
+- Pull requests: docs fixes, bug fixes, new features
+
+> Testing on Linux and with agents other than Claude Code is especially useful right now, since `ski` has only been used on macOS so far.
+
+## Reporting a bug
+
+[Open a bug report](https://github.com/osrim/ski/issues/new?template=bug.yml). The form asks for `ski --version`, the command, what `ski` printed, and what you expected. A report with those four things can usually be fixed without a follow-up question.
+
+## Before you start on a change
+
+Open an issue first for anything beyond a small fix, so the change can be discussed before you spend time on it. Questions go in issues too.
+
+## Set up `ski` locally
 
 You need [Bun](https://bun.sh).
 
 ```sh
-cd cli
 bun install
+cd cli
 bun link
 ```
 
@@ -20,16 +35,32 @@ export PATH="$HOME/.bun/bin:$PATH"
 
 ## Check your change
 
-Run from `cli/`:
+Run from `cli/`. CI runs the same four commands.
 
 ```sh
 bun run typecheck
 bun run lint
 bun run fmt:check
-bun test
+bun run test
 ```
 
-Use `bun run lint:fix` and `bun run fmt` to apply fixes.
+`bun run lint:fix` and `bun run fmt` apply fixes.
+
+## Submitting a PR
+
+- One change per PR.
+- The title is a lowercase conventional commit, such as `feat: add agent target`. PRs are squash-merged, so the title becomes the commit subject and the release-notes line.
+- Behavior changes need tests.
+- A change to a contract (commands, exit codes, lockfile) updates its doc in the same PR.
+- Your contribution is licensed under the [MIT license](LICENSE), like the rest of the project.
+
+## AI-assisted contributions
+
+AI tools are welcome. Rules:
+
+- You must understand every line you submit and be able to explain it in your own words.
+- Say in the PR that AI was used.
+- Write issues, PR descriptions, and replies yourself. Do not paste long generated text.
 
 ## Read before coding
 
@@ -38,7 +69,3 @@ Use `bun run lint:fix` and `bun run fmt` to apply fixes.
 - [Architecture](docs/contributor/architecture.md) for module boundaries
 - [Terminal style](docs/contributor/terminal-style.md) for prompts and output
 - [Commands](docs/commands.md), [Configuration](docs/configuration.md), and [Security scan](docs/security-scan.md) for the user-facing contract
-
-Update the matching document when you change a command, exit code, or lockfile field.
-
-Use a conventional commit PR title, such as `feat: add agent target`. Squash merges use the PR title as the commit subject.
