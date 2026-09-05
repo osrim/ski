@@ -22,8 +22,8 @@ Open an issue first for anything beyond a small fix, so the change can be discus
 You need [Bun](https://bun.sh).
 
 ```sh
-cd cli
 bun install
+cd cli
 bun link
 ```
 
