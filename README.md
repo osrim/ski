@@ -96,7 +96,7 @@ ski remove tdd --yes
 
 ## Work with local changes
 
-By default, `ski` writes one copy of each skill to `.ski/skills/<name>` (or `~/.ski/skills/<name>` for global scope) and links each selected agent directory to it with a relative symlink. `.ski/.gitignore` keeps that directory out of Git, so commit only `ski-lock.json`. The project works from any checkout location, and `~/.ski/store` is only a download cache. Editing a linked skill changes that copy for every linked agent. `ski list` marks changed skills, and `ski install` asks before replacing local changes with the locked files.
+By default, `ski` writes one copy of each skill to `.ski/skills/<name>` (or `~/.local/share/ski/skills/<name>` for global scope) and links each selected agent directory to it with a relative symlink. `.ski/.gitignore` keeps that directory out of Git, so commit only `ski-lock.json`. The project works from any checkout location, and `~/.local/share/ski/store` is only a download cache. Editing a linked skill changes that copy for every linked agent. `ski list` marks changed skills, and `ski install` asks before replacing local changes with the locked files.
 
 Use `--copy` when an agent needs its own real directory instead of a symlink:
 

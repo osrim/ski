@@ -16,9 +16,11 @@ import {
   placementOf,
   updatePlacement,
 } from "./placement.ts";
+import { captureEnv } from "../../test-env.ts";
 
 let tmp: string;
-let prevHome: string | undefined;
+
+const restoreEnv = captureEnv("HOME", "SKI_HOME", "CLAUDE_HOME", "XDG_CONFIG_HOME");
 
 const files: SkillFile[] = [
   { path: "SKILL.md", content: Buffer.from("hello\n"), mode: "100644" },
@@ -41,12 +43,11 @@ beforeAll(async () => {
   process.env.SKI_HOME = join(tmp, "ski-home");
   process.env.CLAUDE_HOME = join(tmp, "claude-home");
   process.env.XDG_CONFIG_HOME = join(tmp, "xdg-config");
-  prevHome = process.env.HOME;
   process.env.HOME = tmp;
 });
 
 afterAll(async () => {
-  process.env.HOME = prevHome;
+  restoreEnv();
   await rm(tmp, { recursive: true, force: true });
 });
 

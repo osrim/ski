@@ -3,16 +3,19 @@ import * as fs from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { captureEnv } from "../test-env.ts";
 import { markUpToDate, startUpdateCheck } from "./update-check.ts";
 
 const NOW = Date.UTC(2026, 7, 24, 12);
 const REGISTRY_URL = "https://registry.npmjs.org/@0scrm/ski/latest";
 
 let tmp: string;
-let previousCache: string | undefined;
-let previousCi: string | undefined;
-let previousOptOut: string | undefined;
-let previousGlobalOptOut: string | undefined;
+const restoreEnv = captureEnv(
+  "XDG_CACHE_HOME",
+  "CI",
+  "SKI_NO_UPDATE_NOTIFIER",
+  "NO_UPDATE_NOTIFIER",
+);
 let ttyDescriptor: PropertyDescriptor | undefined;
 let fetchDescriptor: PropertyDescriptor;
 let fetchMock: ReturnType<typeof mock>;
@@ -24,10 +27,6 @@ const registryVersion = (version: unknown, status = 200): Response =>
 
 beforeAll(async () => {
   tmp = await mkdtemp(join(tmpdir(), "ski-update-check-test-"));
-  previousCache = process.env.XDG_CACHE_HOME;
-  previousCi = process.env.CI;
-  previousOptOut = process.env.SKI_NO_UPDATE_NOTIFIER;
-  previousGlobalOptOut = process.env.NO_UPDATE_NOTIFIER;
   ttyDescriptor = Object.getOwnPropertyDescriptor(process.stdout, "isTTY");
   fetchDescriptor = Object.getOwnPropertyDescriptor(globalThis, "fetch")!;
 });
@@ -47,14 +46,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   Object.defineProperty(globalThis, "fetch", fetchDescriptor);
-  if (previousCache === undefined) delete process.env.XDG_CACHE_HOME;
-  else process.env.XDG_CACHE_HOME = previousCache;
-  if (previousCi === undefined) delete process.env.CI;
-  else process.env.CI = previousCi;
-  if (previousOptOut === undefined) delete process.env.SKI_NO_UPDATE_NOTIFIER;
-  else process.env.SKI_NO_UPDATE_NOTIFIER = previousOptOut;
-  if (previousGlobalOptOut === undefined) delete process.env.NO_UPDATE_NOTIFIER;
-  else process.env.NO_UPDATE_NOTIFIER = previousGlobalOptOut;
+  restoreEnv();
   if (ttyDescriptor === undefined) Reflect.deleteProperty(process.stdout, "isTTY");
   else Object.defineProperty(process.stdout, "isTTY", ttyDescriptor);
   mock.restore();

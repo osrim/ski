@@ -6,21 +6,22 @@ import { linkSkill, writeCanonical } from "../core/install/link.ts";
 import { emptyLock, readLock } from "../core/install/lockfile.ts";
 import { git } from "../core/source/git.ts";
 import { land } from "./flow.ts";
+import { captureEnv } from "../test-env.ts";
 
 let tmp: string;
 let cwd: string;
-let skiHome: string | undefined;
+
+const restoreEnv = captureEnv("SKI_HOME");
 
 beforeAll(async () => {
   tmp = await mkdtemp(join(tmpdir(), "ski-flow-test-"));
   cwd = process.cwd();
-  skiHome = process.env.SKI_HOME;
   process.env.SKI_HOME = join(tmp, "ski-home");
 });
 
 afterAll(async () => {
   process.chdir(cwd);
-  process.env.SKI_HOME = skiHome;
+  restoreEnv();
   process.exitCode = 0;
   await rm(tmp, { recursive: true, force: true });
 });

@@ -2,14 +2,14 @@ import { readFile, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import writeFileAtomic from "write-file-atomic";
 import { parseAgentFlag, type AgentId } from "./install/agents.ts";
-import { skiHome, type Scope } from "./paths.ts";
+import { configDir, type Scope } from "./paths.ts";
 
 export interface Config {
   scope?: Scope;
   agents?: AgentId[];
 }
 
-export const configPath = (): string => join(skiHome(), "config.json");
+export const configPath = (): string => join(configDir(), "config.json");
 
 export const parseConfig = (text: string): Config => {
   let raw: unknown;

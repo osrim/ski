@@ -29,11 +29,13 @@ import {
   writeCanonical,
 } from "./link.ts";
 import { skillsDir } from "./agents.ts";
-import { skiHome, storeDir } from "../paths.ts";
+import { dataDir, storeDir } from "../paths.ts";
 import type { SkillFile } from "../skill/files.ts";
+import { captureEnv } from "../../test-env.ts";
 
 let tmp: string;
-let prevHome: string | undefined;
+
+const restoreEnv = captureEnv("HOME", "SKI_HOME", "CLAUDE_HOME", "XDG_CONFIG_HOME");
 
 const files: SkillFile[] = [
   { path: "SKILL.md", content: Buffer.from("hello\n"), mode: "100644" },
@@ -45,12 +47,11 @@ beforeAll(async () => {
   process.env.SKI_HOME = join(tmp, "ski-home");
   process.env.CLAUDE_HOME = join(tmp, "claude-home");
   process.env.XDG_CONFIG_HOME = join(tmp, "xdg-config");
-  prevHome = process.env.HOME;
   process.env.HOME = tmp;
 });
 
 afterAll(async () => {
-  process.env.HOME = prevHome;
+  restoreEnv();
   await rm(tmp, { recursive: true, force: true });
 });
 
@@ -142,8 +143,8 @@ test.each([
 });
 
 test("a rejected name or source writes nothing outside the store", () => {
-  expect(existsSync(join(skiHome(), "x.tmp"))).toBe(false);
-  expect(existsSync(join(skiHome(), "demo.tmp"))).toBe(false);
+  expect(existsSync(join(dataDir(), "x.tmp"))).toBe(false);
+  expect(existsSync(join(dataDir(), "demo.tmp"))).toBe(false);
   expect(existsSync(join(storeDir(), "github.com_o_r", "a"))).toBe(false);
 });
 

@@ -25,6 +25,7 @@ upward.
 ```text
 cli/src/
   index.ts
+  test-env.ts      environment capture and restore, for tests only
   commands/        add, install, update, remove, list
   ui/              prompts, gates, reports, help, status, placement choices
   core/

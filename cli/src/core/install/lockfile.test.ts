@@ -12,8 +12,11 @@ import {
   type Lockfile,
 } from "./lockfile.ts";
 import { lockPath, projectRoot } from "../paths.ts";
+import { captureEnv } from "../../test-env.ts";
 
 let tmp: string;
+
+const restoreEnv = captureEnv("SKI_HOME");
 
 beforeAll(async () => {
   tmp = await realpath(await mkdtemp(join(tmpdir(), "ski-lock-test-")));
@@ -21,6 +24,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  restoreEnv();
   await rm(tmp, { recursive: true, force: true });
 });
 

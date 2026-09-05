@@ -38,12 +38,18 @@ export const userHome = (): string => {
 };
 
 export const claudeDir = (): string => envPath("CLAUDE_HOME") ?? join(userHome(), ".claude");
-export const skiHome = (): string => envPath("SKI_HOME") ?? join(userHome(), ".ski");
-export const storeDir = (): string => join(skiHome(), "store");
+
+const xdgDir = (variable: string, homeSegment: string): string =>
+  join(envPath(variable, false) ?? join(userHome(), homeSegment), "ski");
+
+export const dataDir = (): string =>
+  envPath("SKI_HOME") ?? xdgDir("XDG_DATA_HOME", join(".local", "share"));
+export const configDir = (): string => envPath("SKI_HOME") ?? xdgDir("XDG_CONFIG_HOME", ".config");
+export const cacheDir = (): string => xdgDir("XDG_CACHE_HOME", ".cache");
+
+export const storeDir = (): string => join(dataDir(), "store");
 export const canonicalDir = (scope: Scope): string =>
-  join(scope === "global" ? skiHome() : join(projectRoot(), ".ski"), "skills");
-export const cacheDir = (): string =>
-  join(envPath("XDG_CACHE_HOME", false) ?? join(userHome(), ".cache"), "ski");
+  join(scope === "global" ? dataDir() : join(projectRoot(), ".ski"), "skills");
 
 const ROOT_MARKERS = [LOCKFILE_NAME, ".claude", ".opencode", ".agents", ".git"];
 
@@ -56,4 +62,4 @@ export const projectRoot = (): string => {
 };
 
 export const lockPath = (scope: Scope): string =>
-  scope === "global" ? join(skiHome(), LOCKFILE_NAME) : join(projectRoot(), LOCKFILE_NAME);
+  scope === "global" ? join(dataDir(), LOCKFILE_NAME) : join(projectRoot(), LOCKFILE_NAME);

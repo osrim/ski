@@ -4,7 +4,7 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 import { skillsDir, AGENTS, type AgentId } from "./agents.ts";
 import { writeFiles, type SkillFile } from "../skill/files.ts";
 import { integrityOfDir } from "../skill/integrity.ts";
-import { canonicalDir, childPath, skiHome, type Scope } from "../paths.ts";
+import { canonicalDir, childPath, dataDir, type Scope } from "../paths.ts";
 
 const isSymlinkPath = async (path: string): Promise<boolean> => {
   try {
@@ -54,7 +54,7 @@ export const assertSkillsDirSafe = async (scope: Scope, agent: AgentId): Promise
   }
   if (!(await isSymlinkPath(dest))) return dest;
   const resolved = await realpathOrNearest(resolve(dirname(dest), await readlink(dest)));
-  const forbidden = [{ label: "the store", root: skiHome() }];
+  const forbidden = [{ label: "the store", root: dataDir() }];
   if (scope === "project") {
     for (const def of AGENTS)
       forbidden.push({ label: "a global skills dir", root: def.globalDir() });

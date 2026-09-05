@@ -39,7 +39,7 @@ Use these terms in code, docs, and output.
 | --- | --- | --- |
 | scope | `global` for one machine or `project` for one project root. | workspace, environment, context |
 | project root | Nearest parent with `ski-lock.json`, an agent directory, or `.git`. | workspace root, repo root, cwd |
-| store entry | Cached directory in `~/.ski/store` holding one skill at one integrity. Never a link target. | package dir, cache entry, snapshot |
+| store entry | Cached directory in `~/.local/share/ski/store` holding one skill at one integrity. Never a link target. | package dir, cache entry, snapshot |
 | canonical copy | Real skill directory in `.ski/skills` that links point to. One per scope. `ski` owns it while a link row names it. | master copy, primary |
 | link | Relative symlink from an agent's skills directory to the canonical copy. | shortcut, alias, pointer |
 | copy | Real skill directory written with `add --copy`. | clone, download |

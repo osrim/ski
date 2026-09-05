@@ -33,10 +33,24 @@ Using project scope. Use -g for global.
 Linking to claude.
 ```
 
-`ski` saves explicit scope and agent choices in `~/.ski/config.json`. A broken preference is ignored.
+`ski` saves explicit scope and agent choices in the config file. A broken preference is ignored.
 
 Saved scope and agent targets preselect the next prompt. A new choice in the prompt or an explicit
 flag replaces the saved value.
+
+## Paths
+
+`ski` follows the XDG base directories.
+
+| path | default | variable |
+| --- | --- | --- |
+| global skills | `~/.local/share/ski/skills` | `XDG_DATA_HOME` |
+| store | `~/.local/share/ski/store` | `XDG_DATA_HOME` |
+| global lockfile | `~/.local/share/ski/ski-lock.json` | `XDG_DATA_HOME` |
+| config | `~/.config/ski/config.json` | `XDG_CONFIG_HOME` |
+| update-check stamp | `~/.cache/ski/last-update-check` | `XDG_CACHE_HOME` |
+
+`SKI_HOME` replaces the data root and the config root at once, so `SKI_HOME=/tmp/x` puts the store, the global lockfile, and the config under `/tmp/x`. Every path variable must be absolute.
 
 ## Security review
 
