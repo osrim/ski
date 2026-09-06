@@ -108,4 +108,4 @@ Color is also off when stdout is not a terminal or `TERM=dumb`.
 
 ## Update notice
 
-Commands that use the network check the latest GitHub release for a newer `ski` at most once a day and print a notice on stderr after the command output. No request is made when stdout is not a terminal, when `--json` is set, when `ski` runs from a Git checkout, or when one of the variables above is set.
+Commands that use the network check the latest GitHub release for a newer `ski` at most once a day and print a notice on stderr after the command output. The notice names `brew upgrade` when the binary is a Homebrew install and links to the latest release otherwise. No request is made when stdout is not a terminal, when `--json` is set, when `ski` runs from a Git checkout, or when one of the variables above is set.

@@ -7,7 +7,7 @@ Every kind of contribution is welcome:
 - Issues: bug reports, feature requests, questions, ideas
 - Pull requests: docs fixes, bug fixes, new features
 
-> Testing on agents other than Claude Code is especially useful right now, since `ski` has only been used on macOS so far.
+> Reports from Linux and from agents other than Claude Code help most right now. Most use of `ski` so far was on macOS with Claude Code and Codex.
 
 ## Reporting a bug
 

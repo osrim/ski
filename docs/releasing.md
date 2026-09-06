@@ -1,6 +1,6 @@
 # Releasing
 
-For maintainers. A release is a tag, a GitHub Release with two macOS binaries, and a Homebrew formula.
+For maintainers. A release is a tag, a GitHub Release with four binaries, and a Homebrew formula.
 
 ## Version scheme
 
@@ -22,27 +22,39 @@ Do not create tags by hand.
 
 ## What release.yml does
 
-Runs on `macos-latest` (arm64). Rosetta runs the Intel smoke test.
+The `build` job is a matrix. Each matrix job compiles one binary on a runner that can run it:
+
+| binary | runner |
+| --- | --- |
+| `darwin-arm64` | `macos-latest` |
+| `darwin-x64` | `macos-latest`, smoke test under Rosetta |
+| `linux-x64` | `ubuntu-latest` |
+| `linux-arm64` | `ubuntu-24.04-arm` |
+
+Each matrix job checks `ski --version`, runs `ski add` and `ski install` against a local skill, and uploads `ski-<os>-<arch>.tar.gz` as a workflow artifact.
+
+The `release` job runs on `ubuntu-latest` after all matrix jobs pass:
 
 1. Runs the test suite.
 2. Checks that `cli/package.json` matches the tag.
-3. Compiles one binary per architecture and checks `ski --version` on each.
-4. Uploads `ski-darwin-arm64.tar.gz`, `ski-darwin-x64.tar.gz`, and `checksums.txt` to a GitHub Release. Notes are generated from merged PR titles.
+3. Downloads the tarballs and writes `checksums.txt`.
+4. Uploads them to a GitHub Release. Notes are generated from merged PR titles.
 5. Renders `Formula/ski.rb` with `cli/scripts/brew-formula.ts` and pushes it to `osrim/homebrew-tap` with the `TAP_DEPLOY_KEY` secret.
 
-Step 5 runs last: the asset must be public before the formula points at it. From then on `brew install osrim/tap/ski` and `brew upgrade` serve the new version.
+Step 5 runs last. The asset must be public before the formula points at it. From then on `brew install osrim/tap/ski` and `brew upgrade` serve the new version.
 
-Local check of steps 3 and 5. The formula script only needs a `checksums.txt`, so a fake one is enough:
+To check the build and the formula locally, use a fake `checksums.txt` with four different hashes. `brew style` only lints a formula inside a tap. Render into the local tap checkout, lint, then reset the tap:
 
 ```sh
 bun run build && ./dist/ski --version
-printf '%064d  ski-darwin-arm64.tar.gz\n%064d  ski-darwin-x64.tar.gz\n' 0 0 > dist/checksums.txt
-bun scripts/brew-formula.ts 0.1.0 dist/checksums.txt
+printf '%064d  ski-darwin-arm64.tar.gz\n%064d  ski-darwin-x64.tar.gz\n%064d  ski-linux-arm64.tar.gz\n%064d  ski-linux-x64.tar.gz\n' 1 2 3 4 > dist/checksums.txt
+bun scripts/brew-formula.ts 0.1.0 dist/checksums.txt > "$(brew --repo osrim/tap)/Formula/ski.rb"
+brew style osrim/tap/ski && git -C "$(brew --repo osrim/tap)" checkout Formula/ski.rb
 ```
 
-## Supported platform
+## Supported platforms
 
-macOS only, Apple silicon and Intel. The Intel binary is the Bun `x64-baseline` build, so it runs on every Intel Mac and under Rosetta. The formula declares `depends_on :macos`, so Linux fails at `brew install` with a clear message. Linux is tracked as future work.
+macOS on Apple silicon and Intel. Linux on x64 and arm64 with glibc 2.17 or newer. The x64 binaries are Bun `baseline` builds, so they run without AVX2 and under Rosetta. Alpine and other musl distributions are not supported. Bun has `-musl` targets when that changes.
 
 ## Prereleases
 

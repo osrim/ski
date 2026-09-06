@@ -17,12 +17,13 @@
 
 ## Install
 
+[Homebrew](https://brew.sh), on macOS or Linux:
+
 ```sh
-brew tap osrim/tap
 brew install osrim/tap/ski
 ```
 
-> ⚠️ `ski` currently runs on macOS only.
+Or download the binary for your platform from the [latest release](https://github.com/osrim/ski/releases/latest) and put it on your `PATH`. `ski` needs `git`. For CI, see [Commands](docs/commands.md#ci).
 
 ## Quickstart
 
