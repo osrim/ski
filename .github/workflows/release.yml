@@ -92,7 +92,11 @@ jobs:
 
           cd "$tap"
           git add Formula/ski.rb
-          git -c user.name=github-actions[bot] \
-              -c user.email=41898282+github-actions[bot]@users.noreply.github.com \
-              commit -m "ski $TAG"
-          git push
+          if git diff --cached --quiet; then
+            echo "Formula/ski.rb unchanged, nothing to push"
+          else
+            git -c user.name=github-actions[bot] \
+                -c user.email=41898282+github-actions[bot]@users.noreply.github.com \
+                commit -m "ski $TAG"
+            git push
+          fi

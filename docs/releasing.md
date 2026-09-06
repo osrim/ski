@@ -1,6 +1,6 @@
 # Releasing
 
-For maintainers. A release is a tag, a GitHub Release with one binary, and a Homebrew formula.
+For maintainers. A release is a tag, a GitHub Release with two macOS binaries, and a Homebrew formula.
 
 ## Version scheme
 
@@ -32,10 +32,11 @@ Runs on `macos-latest` (arm64). Rosetta runs the Intel smoke test.
 
 Step 5 runs last: the asset must be public before the formula points at it. From then on `brew install osrim/tap/ski` and `brew upgrade` serve the new version.
 
-Local check of steps 3 and 5:
+Local check of steps 3 and 5. The formula script only needs a `checksums.txt`, so a fake one is enough:
 
 ```sh
 bun run build && ./dist/ski --version
+printf '%064d  ski-darwin-arm64.tar.gz\n%064d  ski-darwin-x64.tar.gz\n' 0 0 > dist/checksums.txt
 bun scripts/brew-formula.ts 0.1.0 dist/checksums.txt
 ```
 
@@ -51,12 +52,14 @@ None before 1.0. When one is needed, choose a `-beta.N` version in `bumpp`. A ta
 
 - Never reuse a version. A version that reached the tap is on users' machines.
 - Runner or network failure: re-run from the Actions tab with `workflow_dispatch` and the tag as input. Existing assets are replaced.
-- Failure before the tap step, fix needed in code: delete the tag and the Release, fix on `main`, run `bumpp` again with the same version.
+- Failure before the tap step, fix needed in code: delete the tag and the Release, merge the fix on `main`, then tag again by hand. `cli/package.json` already holds `X.Y.Z`, so `bumpp` is not run again.
 
   ```sh
   gh release delete vX.Y.Z --yes
   git push origin :refs/tags/vX.Y.Z
   git tag -d vX.Y.Z
+  # after the fix is on main
+  git tag vX.Y.Z && git push origin vX.Y.Z
   ```
 
 - Failure after the tap step, or a bug found in a shipped version: ship a patch release.

@@ -104,4 +104,4 @@ Use these terms in code, docs, and output.
 | term | meaning | avoid |
 | --- | --- | --- |
 | version | `ski`'s semver number. | revision, build |
-| release | Tagged commit, GitHub release with the binary, and Homebrew formula for one version. | publish, ship, cut |
+| release | Tagged commit and GitHub release with the binaries for one version. Stable versions also get the Homebrew formula. | publish, ship, cut |
