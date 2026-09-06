@@ -39,7 +39,10 @@ beforeEach(async () => {
   delete process.env.SKI_NO_UPDATE_NOTIFIER;
   delete process.env.NO_UPDATE_NOTIFIER;
   Object.defineProperty(process.stdout, "isTTY", { configurable: true, value: true });
-  Object.defineProperty(process, "execPath", { configurable: true, value: "/usr/local/bin/ski" });
+  Object.defineProperty(process, "execPath", {
+    configurable: true,
+    value: join(tmp, "plain", "ski"),
+  });
   spyOn(fs, "existsSync").mockReturnValue(false);
   spyOn(Date, "now").mockReturnValue(NOW);
   fetchMock = mock(() => Promise.resolve(latestRelease("v1.2.0")));
@@ -80,7 +83,7 @@ test("the upgrade hint names brew only for a Cellar binary", () => {
   const download = "Download it from https://github.com/osrim/ski/releases/latest";
   expect(upgradeHint("/opt/homebrew/Cellar/ski/1.2.0/bin/ski")).toBe(brew);
   expect(upgradeHint("/home/linuxbrew/.linuxbrew/Cellar/ski/1.2.0/bin/ski")).toBe(brew);
-  expect(upgradeHint("/usr/local/bin/ski")).toBe(download);
+  expect(upgradeHint(join(tmp, "plain", "ski"))).toBe(download);
 });
 
 test("the upgrade hint resolves a symlink into the Cellar", async () => {
