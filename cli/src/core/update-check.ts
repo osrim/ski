@@ -4,8 +4,7 @@ import * as find from "empathic/find";
 import { cacheDir } from "./paths.ts";
 import { isNewerVersion } from "./source/semver.ts";
 
-const PACKAGE = "@0scrm/ski";
-const REGISTRY_URL = `https://registry.npmjs.org/${PACKAGE}/latest`;
+const LATEST_RELEASE_URL = "https://api.github.com/repos/osrim/ski/releases/latest";
 const TTL_MS = 24 * 60 * 60 * 1000;
 const TIMEOUT_MS = 1500;
 
@@ -37,10 +36,13 @@ const silenced = (json: boolean): boolean =>
 
 const latestVersion = async (): Promise<string | null> => {
   try {
-    const response = await fetch(REGISTRY_URL, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+    const response = await fetch(LATEST_RELEASE_URL, {
+      headers: { Accept: "application/vnd.github+json" },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
     if (!response.ok) return null;
-    const body = (await response.json()) as { version?: unknown };
-    return typeof body.version === "string" ? body.version : null;
+    const body = (await response.json()) as { tag_name?: unknown };
+    return typeof body.tag_name === "string" ? body.tag_name.replace(/^v/u, "") : null;
   } catch {
     return null;
   }
@@ -55,5 +57,5 @@ export const startUpdateCheck = async (
   if (!latest) return null;
   await markUpToDate();
   if (!isNewerVersion(latest, currentVersion)) return null;
-  return `Update available: ${currentVersion} → ${latest}\nRun \`npm i -g ${PACKAGE}@latest\` to update.`;
+  return `Update available: ${currentVersion} → ${latest}\nRun \`brew upgrade osrim/tap/ski\` to update.`;
 };

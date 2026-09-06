@@ -7,7 +7,7 @@ import { captureEnv } from "../test-env.ts";
 import { markUpToDate, startUpdateCheck } from "./update-check.ts";
 
 const NOW = Date.UTC(2026, 7, 24, 12);
-const REGISTRY_URL = "https://registry.npmjs.org/@0scrm/ski/latest";
+const LATEST_RELEASE_URL = "https://api.github.com/repos/osrim/ski/releases/latest";
 
 let tmp: string;
 const restoreEnv = captureEnv(
@@ -22,8 +22,8 @@ let fetchMock: ReturnType<typeof mock>;
 
 const stampPath = (): string => join(process.env.XDG_CACHE_HOME!, "ski", "last-update-check");
 
-const registryVersion = (version: unknown, status = 200): Response =>
-  Response.json({ version }, { status });
+const latestRelease = (tag_name: unknown, status = 200): Response =>
+  Response.json({ tag_name }, { status });
 
 beforeAll(async () => {
   tmp = await mkdtemp(join(tmpdir(), "ski-update-check-test-"));
@@ -39,7 +39,7 @@ beforeEach(async () => {
   Object.defineProperty(process.stdout, "isTTY", { configurable: true, value: true });
   spyOn(fs, "existsSync").mockReturnValue(false);
   spyOn(Date, "now").mockReturnValue(NOW);
-  fetchMock = mock(() => Promise.resolve(registryVersion("1.2.0")));
+  fetchMock = mock(() => Promise.resolve(latestRelease("v1.2.0")));
   Object.defineProperty(globalThis, "fetch", { ...fetchDescriptor, value: fetchMock });
   await rm(process.env.XDG_CACHE_HOME, { recursive: true, force: true });
 });
@@ -56,30 +56,33 @@ afterAll(async () => {
   await rm(tmp, { recursive: true, force: true });
 });
 
-test("a newer registry version returns the npm update notice and records the check", async () => {
+test("a newer release returns the brew update notice and records the check", async () => {
   expect(await startUpdateCheck("1.1.0", false)).toBe(
-    "Update available: 1.1.0 → 1.2.0\nRun `npm i -g @0scrm/ski@latest` to update.",
+    "Update available: 1.1.0 → 1.2.0\nRun `brew upgrade osrim/tap/ski` to update.",
   );
   expect(fetchMock).toHaveBeenCalledTimes(1);
   const [url, options] = fetchMock.mock.calls[0]!;
-  expect(url).toBe(REGISTRY_URL);
-  expect(options).toMatchObject({ signal: expect.any(AbortSignal) });
+  expect(url).toBe(LATEST_RELEASE_URL);
+  expect(options).toMatchObject({
+    headers: { Accept: "application/vnd.github+json" },
+    signal: expect.any(AbortSignal),
+  });
   expect(await readFile(stampPath(), "utf8")).toBe(String(NOW));
 });
 
 test("an up-to-date version is silent but still records the completed check", async () => {
-  fetchMock.mockResolvedValueOnce(registryVersion("1.1.0"));
+  fetchMock.mockResolvedValueOnce(latestRelease("v1.1.0"));
   expect(await startUpdateCheck("1.1.0", false)).toBeNull();
   expect(await readFile(stampPath(), "utf8")).toBe(String(NOW));
 });
 
-test("a recent stamp skips the registry", async () => {
+test("a recent stamp skips the request", async () => {
   await markUpToDate();
   expect(await startUpdateCheck("1.1.0", false)).toBeNull();
   expect(fetchMock).not.toHaveBeenCalled();
 });
 
-test("an expired or invalid stamp permits another registry check", async () => {
+test("an expired or invalid stamp permits another check", async () => {
   await markUpToDate();
   await writeFile(stampPath(), String(NOW - 24 * 60 * 60 * 1000));
   expect(await startUpdateCheck("1.1.0", false)).not.toBeNull();
@@ -133,9 +136,9 @@ test.each([
 });
 
 test.each([
-  ["an HTTP error", () => registryVersion({ error: "missing" }, 404)],
-  ["a missing version", () => registryVersion(null)],
-  ["a non-string version", () => registryVersion(120)],
+  ["an HTTP error", () => latestRelease("v1.2.0", 404)],
+  ["a missing tag", () => latestRelease(null)],
+  ["a non-string tag", () => latestRelease(120)],
   [
     "invalid JSON",
     () => new Response("not json", { headers: { "content-type": "application/json" } }),
@@ -146,7 +149,7 @@ test.each([
   expect(readFile(stampPath(), "utf8")).rejects.toThrow();
 });
 
-test("a rejected registry request fails silently without recording a check", async () => {
+test("a rejected request fails silently without recording a check", async () => {
   fetchMock.mockRejectedValueOnce(new Error("offline"));
   expect(await startUpdateCheck("1.1.0", false)).toBeNull();
   expect(readFile(stampPath(), "utf8")).rejects.toThrow();

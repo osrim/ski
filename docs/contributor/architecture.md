@@ -28,7 +28,7 @@ cli/src/
     config.ts        remembered scope and agent choices
     paths.ts         XDG roots, project root, lockfile path
     suggest.ts       command typo suggestions
-    update-check.ts  registry version check
+    update-check.ts  latest release version check
     usage.ts         usage error type
     source/          coordinates, Git and local sources, revisions, upstream
     skill/           files, frontmatter, integrity, dependency mentions

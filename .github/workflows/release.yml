@@ -1,0 +1,102 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to release again, for example v0.1.0
+        required: true
+        type: string
+
+permissions: {}
+
+defaults:
+  run:
+    working-directory: cli
+
+jobs:
+  release:
+    # The only job on macOS, the platform ski ships to. macos-latest is arm64;
+    # the Intel binary is cross-compiled and smoke-tested under Rosetta.
+    runs-on: macos-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+        working-directory: .
+      - run: bun run test
+
+      - name: Check that package.json matches the tag
+        run: |
+          version=$(bun -p 'require("./package.json").version')
+          if [ "v$version" != "$TAG" ]; then
+            echo "cli/package.json is $version, tag is $TAG" >&2
+            exit 1
+          fi
+
+      # Same flags as `bun run build` in package.json, once per target.
+      - name: Build and pack
+        run: |
+          for target in arm64 x64-baseline; do
+            arch=${target%-baseline}
+            bun build --compile --minify --no-compile-autoload-dotenv --no-compile-autoload-bunfig \
+              --target="bun-darwin-$target" src/index.ts --outfile "dist/$arch/ski"
+            tar czf "dist/ski-darwin-$arch.tar.gz" -C "dist/$arch" ski
+          done
+          cd dist && shasum -a 256 ski-darwin-*.tar.gz > checksums.txt
+
+      - name: Smoke test both binaries
+        run: |
+          ./dist/arm64/ski --version | grep -F "ski/${TAG#v} darwin-arm64"
+          arch -x86_64 ./dist/x64/ski --version | grep -F "ski/${TAG#v} darwin-x64"
+
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" dist/*.tar.gz dist/checksums.txt --clobber
+          else
+            args=(--generate-notes)
+            case "$TAG" in *-*) args+=(--prerelease) ;; esac
+            gh release create "$TAG" dist/*.tar.gz dist/checksums.txt "${args[@]}"
+          fi
+
+      # Last: the asset must be public before the formula points at it.
+      - name: Update the Homebrew tap
+        if: ${{ !contains(env.TAG, '-') }}
+        env:
+          TAP_DEPLOY_KEY: ${{ secrets.TAP_DEPLOY_KEY }}
+        run: |
+          key="$RUNNER_TEMP/tap-deploy"
+          printf '%s\n' "$TAP_DEPLOY_KEY" > "$key"
+          chmod 600 "$key"
+          export GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+
+          tap="$RUNNER_TEMP/tap"
+          git clone --depth 1 git@github.com:osrim/homebrew-tap.git "$tap"
+          mkdir -p "$tap/Formula"
+          bun scripts/brew-formula.ts "${TAG#v}" dist/checksums.txt > "$tap/Formula/ski.rb"
+
+          cd "$tap"
+          git add Formula/ski.rb
+          if git diff --cached --quiet; then
+            echo "Formula/ski.rb unchanged, nothing to push"
+          else
+            git -c user.name=github-actions[bot] \
+                -c user.email=41898282+github-actions[bot]@users.noreply.github.com \
+                commit -m "ski $TAG"
+            git push
+          fi

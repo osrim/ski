@@ -7,7 +7,7 @@ Every kind of contribution is welcome:
 - Issues: bug reports, feature requests, questions, ideas
 - Pull requests: docs fixes, bug fixes, new features
 
-> Testing on Linux and with agents other than Claude Code is especially useful right now, since `ski` has only been used on macOS so far.
+> Testing on agents other than Claude Code is especially useful right now, since `ski` has only been used on macOS so far.
 
 ## Reporting a bug
 
@@ -67,5 +67,6 @@ AI tools are welcome. Rules:
 - [Glossary](CONTEXT.md) for project terms
 - [Code standards](docs/contributor/standards.md) for quality rules
 - [Architecture](docs/contributor/architecture.md) for module boundaries
+- [Releasing](docs/releasing.md) for how a version ships (maintainers)
 - [Terminal style](docs/contributor/terminal-style.md) for prompts and output
 - [Commands](docs/commands.md), [Configuration](docs/configuration.md), and [Security scan](docs/security-scan.md) for the user-facing contract

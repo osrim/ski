@@ -1,6 +1,7 @@
 {
-	"name": "@0scrm/ski",
+	"name": "osrim/ski",
 	"version": "0.0.0",
+	"private": true,
 	"description": "Skill manager for coding agents",
 	"type": "module",
 	"bin": {
@@ -8,10 +9,11 @@
 	},
 	"scripts": {
 		"typecheck": "tsc --noEmit",
-		"lint": "oxlint src",
-		"lint:fix": "oxlint --fix src",
-		"fmt": "oxfmt src",
-		"fmt:check": "oxfmt --check src",
+		"build": "bun build --compile --minify --no-compile-autoload-dotenv --no-compile-autoload-bunfig src/index.ts --outfile dist/ski",
+		"lint": "oxlint src scripts",
+		"lint:fix": "oxlint --fix src scripts",
+		"fmt": "oxfmt src scripts",
+		"fmt:check": "oxfmt --check src scripts",
 		"test": "bun test --timeout 30000"
 	},
 	"dependencies": {
