@@ -5,7 +5,7 @@
 
 `ski` installs, updates, and links community skills into your coding agent. It scans every file before writing it and records what you installed in `ski-lock.json`, so your team runs the same reviewed skills.
 
-<img width="1200" height="663" alt="ski-screen-capture" src="https://github.com/user-attachments/assets/5f23bea3-5fb3-495b-9ab4-f75a50461b4d" />
+<img width="1200" height="663" alt="ski-screen-capture" src="https://github.com/user-attachments/assets/ff8199c3-346d-4758-830c-ece12cc7607a" />
 
 ## Features
 
