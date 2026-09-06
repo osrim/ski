@@ -1,10 +1,10 @@
 import { afterAll, afterEach, beforeAll, beforeEach, expect, mock, spyOn, test } from "bun:test";
 import * as fs from "node:fs";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { captureEnv } from "../test-env.ts";
-import { markUpToDate, startUpdateCheck } from "./update-check.ts";
+import { markUpToDate, startUpdateCheck, upgradeHint } from "./update-check.ts";
 
 const NOW = Date.UTC(2026, 7, 24, 12);
 const LATEST_RELEASE_URL = "https://api.github.com/repos/osrim/ski/releases/latest";
@@ -17,6 +17,7 @@ const restoreEnv = captureEnv(
   "NO_UPDATE_NOTIFIER",
 );
 let ttyDescriptor: PropertyDescriptor | undefined;
+let execPathDescriptor: PropertyDescriptor | undefined;
 let fetchDescriptor: PropertyDescriptor;
 let fetchMock: ReturnType<typeof mock>;
 
@@ -28,6 +29,7 @@ const latestRelease = (tag_name: unknown, status = 200): Response =>
 beforeAll(async () => {
   tmp = await mkdtemp(join(tmpdir(), "ski-update-check-test-"));
   ttyDescriptor = Object.getOwnPropertyDescriptor(process.stdout, "isTTY");
+  execPathDescriptor = Object.getOwnPropertyDescriptor(process, "execPath");
   fetchDescriptor = Object.getOwnPropertyDescriptor(globalThis, "fetch")!;
 });
 
@@ -37,6 +39,7 @@ beforeEach(async () => {
   delete process.env.SKI_NO_UPDATE_NOTIFIER;
   delete process.env.NO_UPDATE_NOTIFIER;
   Object.defineProperty(process.stdout, "isTTY", { configurable: true, value: true });
+  Object.defineProperty(process, "execPath", { configurable: true, value: "/usr/local/bin/ski" });
   spyOn(fs, "existsSync").mockReturnValue(false);
   spyOn(Date, "now").mockReturnValue(NOW);
   fetchMock = mock(() => Promise.resolve(latestRelease("v1.2.0")));
@@ -49,6 +52,8 @@ afterEach(() => {
   restoreEnv();
   if (ttyDescriptor === undefined) Reflect.deleteProperty(process.stdout, "isTTY");
   else Object.defineProperty(process.stdout, "isTTY", ttyDescriptor);
+  if (execPathDescriptor === undefined) Reflect.deleteProperty(process, "execPath");
+  else Object.defineProperty(process, "execPath", execPathDescriptor);
   mock.restore();
 });
 
@@ -56,9 +61,9 @@ afterAll(async () => {
   await rm(tmp, { recursive: true, force: true });
 });
 
-test("a newer release returns the brew update notice and records the check", async () => {
+test("a newer release returns the update notice and records the check", async () => {
   expect(await startUpdateCheck("1.1.0", false)).toBe(
-    "Update available: 1.1.0 → 1.2.0\nRun `brew upgrade osrim/tap/ski` to update.",
+    "Update available: 1.1.0 → 1.2.0\nDownload it from https://github.com/osrim/ski/releases/latest",
   );
   expect(fetchMock).toHaveBeenCalledTimes(1);
   const [url, options] = fetchMock.mock.calls[0]!;
@@ -68,6 +73,22 @@ test("a newer release returns the brew update notice and records the check", asy
     signal: expect.any(AbortSignal),
   });
   expect(await readFile(stampPath(), "utf8")).toBe(String(NOW));
+});
+
+test("the upgrade hint names brew only for a Cellar binary", () => {
+  const brew = "Run `brew upgrade osrim/tap/ski` to update.";
+  const download = "Download it from https://github.com/osrim/ski/releases/latest";
+  expect(upgradeHint("/opt/homebrew/Cellar/ski/1.2.0/bin/ski")).toBe(brew);
+  expect(upgradeHint("/home/linuxbrew/.linuxbrew/Cellar/ski/1.2.0/bin/ski")).toBe(brew);
+  expect(upgradeHint("/usr/local/bin/ski")).toBe(download);
+});
+
+test("the upgrade hint resolves a symlink into the Cellar", async () => {
+  const cellar = join(tmp, "Cellar", "ski", "1.2.0", "bin");
+  await mkdir(cellar, { recursive: true });
+  await writeFile(join(cellar, "ski"), "");
+  await symlink(join(cellar, "ski"), join(tmp, "ski"));
+  expect(upgradeHint(join(tmp, "ski"))).toContain("brew upgrade");
 });
 
 test("an up-to-date version is silent but still records the completed check", async () => {

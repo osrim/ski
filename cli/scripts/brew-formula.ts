@@ -1,7 +1,4 @@
-// Render Formula/ski.rb for the Homebrew tap.
-// Usage: bun scripts/brew-formula.ts <version> <checksums.txt> > Formula/ski.rb
-
-const asset = (arch: string): string => `ski-darwin-${arch}.tar.gz`;
+const asset = (os: string, arch: string): string => `ski-${os}-${arch}.tar.gz`;
 const DOWNLOAD = "https://github.com/osrim/ski/releases/download";
 
 export const sha256For = (checksums: string, name: string): string => {
@@ -11,21 +8,42 @@ export const sha256For = (checksums: string, name: string): string => {
   return sha;
 };
 
-export const renderFormula = (version: string, checksums: string): string => `class Ski < Formula
+interface Release {
+  version: string;
+  checksums: string;
+}
+
+const source = (release: Release, os: string, arch: string): string => {
+  const name = asset(os, arch);
+  return `      url "${DOWNLOAD}/v${release.version}/${name}"
+      sha256 "${sha256For(release.checksums, name)}"`;
+};
+
+// Homebrew rejects url/sha256 inside top-level on_arm/on_intel, hence the CPU conditional.
+const onSystem = (
+  release: Release,
+  os: "darwin" | "linux",
+): string => `  on_${os === "darwin" ? "macos" : "linux"} do
+    if Hardware::CPU.arm?
+${source(release, os, "arm64")}
+    else
+${source(release, os, "x64")}
+    end
+  end`;
+
+export const renderFormula = (version: string, checksums: string): string => {
+  const release = { version, checksums };
+  return `class Ski < Formula
   desc "Skill manager for coding agents"
   homepage "https://github.com/osrim/ski"
-  if Hardware::CPU.arm?
-    url "${DOWNLOAD}/v${version}/${asset("arm64")}"
-    sha256 "${sha256For(checksums, asset("arm64"))}"
-  else
-    url "${DOWNLOAD}/v${version}/${asset("x64")}"
-    sha256 "${sha256For(checksums, asset("x64"))}"
-  end
   version "${version}"
   license "MIT"
 
   depends_on "git"
-  depends_on :macos
+
+${onSystem(release, "darwin")}
+
+${onSystem(release, "linux")}
 
   def install
     bin.install "ski"
@@ -36,6 +54,7 @@ export const renderFormula = (version: string, checksums: string): string => `cl
   end
 end
 `;
+};
 
 if (import.meta.main) {
   const [version, checksumsPath] = Bun.argv.slice(2);

@@ -1,3 +1,4 @@
+import { realpathSync } from "node:fs";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import * as find from "empathic/find";
@@ -48,6 +49,16 @@ const latestVersion = async (): Promise<string | null> => {
   }
 };
 
+export const upgradeHint = (binary: string): string => {
+  let resolved = binary;
+  try {
+    resolved = realpathSync(binary);
+  } catch {}
+  return resolved.includes("/Cellar/")
+    ? "Run `brew upgrade osrim/tap/ski` to update."
+    : "Download it from https://github.com/osrim/ski/releases/latest";
+};
+
 export const startUpdateCheck = async (
   currentVersion: string,
   json: boolean,
@@ -57,5 +68,5 @@ export const startUpdateCheck = async (
   if (!latest) return null;
   await markUpToDate();
   if (!isNewerVersion(latest, currentVersion)) return null;
-  return `Update available: ${currentVersion} → ${latest}\nRun \`brew upgrade osrim/tap/ski\` to update.`;
+  return `Update available: ${currentVersion} → ${latest}\n${upgradeHint(process.execPath)}`;
 };
