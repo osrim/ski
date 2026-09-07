@@ -3,7 +3,7 @@ import { mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative } from "node:path";
 import { git } from "../source/git.ts";
 import { linkedAgents, skillPath } from "./link.ts";
-import { readLock } from "./lockfile.ts";
+import { placementOf, readLock } from "./lockfile.ts";
 import { installedSkills } from "./destination.ts";
 import { projectRoot } from "../paths.ts";
 
@@ -45,7 +45,9 @@ const excludeFile = async (root: string): Promise<string | null> => {
 
 const managedPatterns = async (toplevel: string): Promise<string[]> => {
   const patterns: string[] = [];
-  const links = installedSkills(await readLock("project")).filter((skill) => !skill.agents);
+  const links = installedSkills(await readLock("project")).filter(
+    (skill) => placementOf(skill).kind === "link",
+  );
   for (const { name } of links) {
     for (const agent of await linkedAgents(name, "project")) {
       const rel = relative(toplevel, skillPath(name, "project", agent));

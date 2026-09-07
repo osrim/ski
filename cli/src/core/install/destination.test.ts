@@ -11,6 +11,7 @@ import { emptyLock, type LockEntry } from "./lockfile.ts";
 import {
   addDestination,
   installDestination,
+  installedPath,
   lackingAgents,
   modifiedSkills,
   locationOf,
@@ -59,12 +60,12 @@ const linkInto = async (name: string, ...agents: AgentId[]): Promise<void> => {
 test("a link's agents come from disk, a copy's from the entry's directories that are present", async () => {
   await linkInto("linked", "claude");
   await mkdir(join(skillsDir("global", "opencode"), "linked"), { recursive: true });
-  expect(await locationOf(entry("linked"), "global")).toEqual({ mode: "link", agents: ["claude"] });
+  expect(await locationOf(entry("linked"), "global")).toEqual({ kind: "link", agents: ["claude"] });
 
   await copySkill("copied", files, "global", "claude", false);
   await mkdir(join(skillsDir("global", "opencode"), "copied"), { recursive: true });
   expect(await locationOf(entry("copied", ["claude", "universal"]), "global")).toEqual({
-    mode: "copy",
+    kind: "agent-copy",
     agents: ["claude"],
   });
 });
@@ -125,21 +126,25 @@ test("modifiedSkills reads a copy entry's directories", async () => {
 test("addDestination treats a copy entry's agents as managed and records the entry", () => {
   const lock = emptyLock();
   const dest = { scope: "global" as const, agents: ["opencode" as const], lock };
+  const link = { kind: "link" as const, ...dest };
   expect(addDestination(entry("fresh", ["claude"]), { ...dest, copy: true })).toEqual({
+    kind: "agent-copy",
     ...dest,
-    copy: { managed: ["claude"] },
+    managed: ["claude"],
   });
   expect(addDestination(undefined, { ...dest, copy: true })).toEqual({
+    kind: "agent-copy",
     ...dest,
-    copy: { managed: [] },
+    managed: [],
   });
-  expect(addDestination(entry("fresh"), { ...dest, copy: false })).toEqual(dest);
-  expect(addDestination(undefined, { ...dest, copy: false })).toEqual(dest);
+  expect(addDestination(entry("fresh"), { ...dest, copy: false })).toEqual(link);
+  expect(addDestination(undefined, { ...dest, copy: false })).toEqual(link);
   expect(addDestination(entry("fresh", ["claude"]), { ...dest, copy: false })).toEqual({
+    kind: "agent-copy",
     ...dest,
-    copy: { managed: ["claude"] },
+    managed: ["claude"],
   });
-  expect(addDestination(entry("fresh"), { ...dest, copy: true })).toEqual(dest);
+  expect(addDestination(entry("fresh"), { ...dest, copy: true })).toEqual(link);
 });
 
 test("updateDestination rewrites the held agents, else the default cover", async () => {
@@ -147,10 +152,11 @@ test("updateDestination rewrites the held agents, else the default cover", async
   expect(await updateDestination(entry("copied", ["claude", "universal"]), "global", lock)).toEqual(
     {
       destination: {
+        kind: "agent-copy",
         scope: "global",
         agents: ["claude", "universal"],
         lock,
-        copy: { managed: ["claude", "universal"] },
+        managed: ["claude", "universal"],
       },
       defaulted: false,
     },
@@ -158,12 +164,12 @@ test("updateDestination rewrites the held agents, else the default cover", async
 
   await linkInto("linked-up", "opencode");
   expect(await updateDestination(entry("linked-up"), "global", lock)).toEqual({
-    destination: { scope: "global", agents: ["opencode"], lock },
+    destination: { kind: "link", scope: "global", agents: ["opencode"], lock },
     defaulted: false,
   });
 
   expect(await updateDestination(entry("nowhere"), "global", lock)).toEqual({
-    destination: { scope: "global", agents: ["claude"], lock },
+    destination: { kind: "link", scope: "global", agents: ["claude"], lock },
     defaulted: true,
   });
 });
@@ -174,12 +180,21 @@ test("installDestination writes only missing and modified copies, and links wher
   await writeFile(join(skillPath("inst", "global", "opencode"), "SKILL.md"), "edited\n");
   const managed: AgentId[] = ["claude", "opencode", "universal"];
   expect(await installDestination(entry("inst", managed), "global", ["claude"])).toEqual({
+    kind: "agent-copy",
     scope: "global",
     agents: ["universal", "opencode"],
-    copy: { managed },
+    managed,
   });
   expect(await installDestination(entry("inst-link"), "global", ["claude", "universal"])).toEqual({
+    kind: "link",
     scope: "global",
     agents: ["claude", "universal"],
   });
+});
+
+test("installedPath returns a present agent copy instead of the canonical link directory", async () => {
+  await copySkill("concrete", files, "global", "universal", false);
+  expect(await installedPath(entry("concrete", ["claude", "universal"]), "global")).toBe(
+    skillPath("concrete", "global", "universal"),
+  );
 });

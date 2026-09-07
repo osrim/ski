@@ -33,7 +33,7 @@ cli/src/
     source/          coordinates, Git and local sources, revisions, upstream
     skill/           files, frontmatter, integrity, dependency mentions
     scan/            scan rules and findings
-    install/         scope, agents, store, links, destination, lockfile
+    install/         scope, agents, store, target checks, links, path copies, destination, lockfile
 ```
 
 `core/source/` and `core/install/` are siblings. Runtime imports point from `install/` to `source/` only. Source adapters may type-import installed skill data. Commands and UI combine the two.
@@ -51,7 +51,15 @@ Every command that writes goes through `ui/flow.ts`, which exports `fetchSkillFi
 
 `land` applies each item, reports failures, writes the supplied lockfile after the batch, and hides managed links from Git. A failed item does not stop the batch. The command exits `1` and the lockfile matches what is on disk. `add` and `remove` always supply a lockfile. `update` supplies one only when a revision moved or a file update was approved. `install` supplies none because it restores the recorded state without changing it.
 
-`core/install/apply.ts` ensures a store entry exists, copies it to the canonical `skills/<name>` directory for the scope, and creates each requested link or copy. The store is a cache: a link entry installs offline when the store already holds its integrity, and installed skills do not depend on the store.
+`core/install/lockfile.ts` derives one `Placement` from each entry: link, agent copy, or path copy. `core/install/destination.ts` switches on that placement.
+
+`core/install/destination.ts` gives commands the installed location, filesystem path, state, apply destination, and removal operation. Commands do not read `agents` or `copyPath` to decide placement.
+
+`core/install/apply.ts` refuses unmanaged targets and ensures that a store entry exists. It then applies the destination's placement.
+
+Links use `core/install/link.ts`. Path copies use `core/install/path-copy.ts`. Both use the path probes and containment check in `core/install/target.ts`.
+
+A path copy does not create a canonical copy or agent link. The store is a cache. Installed skills do not depend on it.
 
 ## Review gate
 

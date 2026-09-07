@@ -131,7 +131,7 @@ describe("pickSkillsToAdd", () => {
         revision: { track: "auto" },
         files: () => Promise.resolve(files),
       },
-      { scope: "global", agents: ["claude"], lock },
+      { kind: "link", scope: "global", agents: ["claude"], lock },
     );
     const both = await pickSkillsToAdd({
       skills: [only],
@@ -231,7 +231,7 @@ describe("pickSkillsToAdd", () => {
         revision: rev,
         files: () => Promise.resolve(files),
       },
-      { scope: "global", agents: ["claude"], lock },
+      { kind: "link", scope: "global", agents: ["claude"], lock },
     );
 
     const picked = await pickSkillsToAdd({
@@ -259,7 +259,7 @@ describe("pickSkillsToAdd", () => {
         revision: { track: "auto" },
         files: () => Promise.resolve(files),
       },
-      { scope: "global", agents: ["claude"], lock, copy: { managed: [] } },
+      { kind: "agent-copy", scope: "global", agents: ["claude"], lock, managed: [] },
     );
     const picked = await pickSkillsToAdd({
       skills: [copied],

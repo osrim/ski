@@ -1,11 +1,14 @@
 import * as p from "@clack/prompts";
 import { applySkill } from "../core/install/apply.ts";
+import type { AgentId } from "../core/install/agents.ts";
 import { assertSkillsDirSafe } from "../core/install/link.ts";
-import { readLock } from "../core/install/lockfile.ts";
+import { placementOf, readLock } from "../core/install/lockfile.ts";
 import {
   installedSkills,
   installDestination,
   modifiedSkills,
+  recordedLocations,
+  type InstalledSkill,
 } from "../core/install/destination.ts";
 import { shortId } from "../core/source/revision.ts";
 import { resolveScope, type ScopeOptions } from "../core/install/scope.ts";
@@ -32,11 +35,6 @@ interface InstallOptions extends ScopeOptions {
 export const run = async (options: InstallOptions): Promise<void> => {
   p.intro("ski install");
   const scope = resolveScope(options, p.log.warn) ?? "project";
-  const agents = await chooseAgents(options, scope);
-  for (const agent of agents) {
-    await assertSkillsDirSafe(scope, agent).catch((e: Error) => fail(e.message));
-  }
-
   const lock = await readLock(scope);
   const skills = installedSkills(lock);
   if (skills.length === 0) {
@@ -44,9 +42,14 @@ export const run = async (options: InstallOptions): Promise<void> => {
     p.outro("Nothing to install.");
     return;
   }
+  const links = skills.filter((skill) => placementOf(skill).kind === "link");
+  const agents = links.length > 0 ? await chooseAgents(options, scope) : [];
+  for (const agent of agents) {
+    await assertSkillsDirSafe(scope, agent).catch((e: Error) => fail(e.message));
+  }
 
   warnScopeCollisions(
-    skills.map((skill) => skill.name),
+    links.map((skill) => skill.name),
     scope,
     agents,
   );
@@ -101,8 +104,14 @@ export const run = async (options: InstallOptions): Promise<void> => {
     scope,
     lock: null,
   });
-  p.outro(`Installed ${installed}/${skills.length} skill(s) (${scope}: ${agents.join(", ")}).`);
+  p.outro(
+    `Installed ${installed}/${skills.length} skill(s) (${scope}: ${installLocations(skills, agents).join(", ")}).`,
+  );
 };
+
+const installLocations = (skills: InstalledSkill[], linked: AgentId[]): string[] => [
+  ...new Set([...linked, ...skills.flatMap(recordedLocations)]),
+];
 
 const confirmOptional = async (message: string, yes?: boolean): Promise<boolean> => {
   if (yes) return true;

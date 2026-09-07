@@ -95,7 +95,7 @@ test("update through the pipeline = new store entry + new canonical copy; the ol
       revision: { commit: v1, branch: "main", track: "auto" },
       files: () => source.fetchFiles(v1, skill.path),
     },
-    { scope: "global", agents: ["claude"], lock },
+    { kind: "link", scope: "global", agents: ["claude"], lock },
   );
   const oldEntry = storeEntryPath(skill.source, skill.name, skill.integrity);
   expect(lock.skills[skill.name]!.commit).toBe(v1);
@@ -110,7 +110,7 @@ test("update through the pipeline = new store entry + new canonical copy; the ol
       revision: verdict!.upstream,
       files: () => Promise.resolve(newFiles),
     },
-    { scope: "global", agents: ["claude"], lock },
+    { kind: "link", scope: "global", agents: ["claude"], lock },
   );
 
   const target = skillPath(skill.name, "global", "claude");

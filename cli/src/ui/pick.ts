@@ -3,7 +3,12 @@ import { basename } from "node:path";
 import type { AgentId } from "../core/install/agents.ts";
 import { selector, type DiscoveredSkill } from "../core/source/discover.ts";
 import { occupiedAgents } from "../core/install/link.ts";
-import { lackingAgents, type Location } from "../core/install/destination.ts";
+import {
+  lackingAgents,
+  locationDisplayPath,
+  locationPresent,
+  type Location,
+} from "../core/install/destination.ts";
 import { nearest } from "../core/suggest.ts";
 import { isApproved, type Lockfile } from "../core/install/lockfile.ts";
 import { integrityOf } from "../core/skill/integrity.ts";
@@ -184,7 +189,7 @@ interface AddSelection {
   agents: AgentId[];
   source: Source;
   rev: Revision;
-  options: { all?: boolean | undefined; copy: boolean };
+  options: { all?: boolean | undefined; copy: boolean; copyPath?: string | undefined };
 }
 
 const approvedMissingAgentsByPath = async (
@@ -236,6 +241,11 @@ export const pickSkillsToAdd = async (selection: AddSelection): Promise<Picked> 
     if ((entry.copy === true) !== options.copy) {
       return `installed as a ${entry.copy ? "copy" : "link"}`;
     }
+    if (entry.copyPath !== options.copyPath) {
+      return entry.copyPath
+        ? `installed as a path copy at ${entry.copyPath}`
+        : "installed as an agent copy";
+    }
     return undefined;
   };
   const failHeld = (skill: DiscoveredSkill, why: string): never =>
@@ -244,7 +254,9 @@ export const pickSkillsToAdd = async (selection: AddSelection): Promise<Picked> 
     );
   const lacking = await approvedMissingAgentsByPath(selection, held);
   const complete = (skill: DiscoveredSkill): boolean => lacking.get(skill.path)?.length === 0;
-  const alreadyIn = `already in ${agents.join(", ")}, skipped`;
+  const alreadyIn = options.copyPath
+    ? `already at ${options.copyPath}, skipped`
+    : `already in ${agents.join(", ")}, skipped`;
   const skipComplete = (skill: DiscoveredSkill): void =>
     p.log.info(`${skillName(skill.name)}: ${alreadyIn}`);
   const split = (chosen: DiscoveredSkill[], asked: boolean): Picked => {
@@ -332,10 +344,12 @@ export const pickToRemove = async (
     (name) => friendlySource(lock.skills[name]!.source),
     (source, rows) => `${source} (${rows.length} skill(s))`,
     (name) => {
-      const where = locations.get(name)!.agents;
+      const location = locations.get(name)!;
+      const path = locationDisplayPath(name, location);
+      const where = location.kind === "path-copy" ? `${path} copy` : path;
       return {
         value: name,
-        label: `${skillName(name)}: ${displayLabel(lock.skills[name]!)} ${where.length > 0 ? `[${where.join(", ")}]` : "[missing]"}`,
+        label: `${skillName(name)}: ${displayLabel(lock.skills[name]!)} ${locationPresent(location) ? `[${where}]` : "[missing]"}`,
       };
     },
   );

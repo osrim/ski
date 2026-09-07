@@ -1,11 +1,12 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import { mkdtemp, realpath, rm, readFile, writeFile, mkdir } from "node:fs/promises";
+import { mkdtemp, realpath, rm, readFile, writeFile, mkdir, symlink } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   emptyLock,
   isApproved,
   parseLock,
+  placementOf,
   readLock,
   serializeLock,
   writeLock,
@@ -149,6 +150,27 @@ test("a copy entry keeps copy and agents through a round trip, in the documented
   expect(await readFile(lockPath("global"), "utf8")).not.toContain("copy");
 });
 
+test("a path copy survives serialization with one project-relative placement", () => {
+  const lock: Lockfile = {
+    lockfileVersion: 1,
+    skills: {
+      tdd: { ...entry, copy: true, copyPath: "custom-directory" },
+    },
+  };
+
+  expect(parseLock(serializeLock(lock), "ski-lock.json")).toEqual(lock);
+  expect(Object.keys(JSON.parse(serializeLock(lock)).skills.tdd)).toEqual([
+    "source",
+    "branch",
+    "path",
+    "commit",
+    "integrity",
+    "track",
+    "copy",
+    "copyPath",
+  ]);
+});
+
 test("isApproved matches only the exact (source, path, integrity) entry; the commit is not part of it", () => {
   const lock: Lockfile = { lockfileVersion: 1, skills: { tdd: entry } };
   const at = { source: entry.source, path: entry.path, integrity };
@@ -244,10 +266,10 @@ test("parse errors: unsafe skill names and inconsistent copy configuration", () 
     "f: a: agents must name at least one agent",
   );
   expect(() => parseLock(lock("a", ',"copy":true'), "f")).toThrow(
-    "f: a: copy and agents must appear together",
+    "f: a: Set exactly one of agents or copyPath when copy is true",
   );
   expect(() => parseLock(lock("a", ',"agents":["claude"]'), "f")).toThrow(
-    "f: a: copy and agents must appear together",
+    "f: a: Set copy to true when an entry contains agents or copyPath",
   );
   expect(parseLock(lock("My_Skill.v2", ',"copy":true,"agents":["claude"]'), "f").skills).toEqual({
     "My_Skill.v2": {
@@ -261,9 +283,71 @@ test("parse errors: unsafe skill names and inconsistent copy configuration", () 
   });
 });
 
+test("parseLock requires one normalized project-relative destination for a path copy", () => {
+  const lock = (extra: string): string =>
+    `{"lockfileVersion":1,"skills":{"a":{"source":"r","path":"","integrity":"${integrity}","track":"auto"${extra}}}}`;
+
+  expect(() => parseLock(lock(',"copy":true,"copyPath":"../market"'), "f")).toThrow(
+    "Use a normalized project-relative destination root for copyPath",
+  );
+  expect(() => parseLock(lock(',"copy":true,"copyPath":"skills/../market"'), "f")).toThrow(
+    "Use a normalized project-relative destination root for copyPath",
+  );
+  expect(() => parseLock(lock(',"copy":true,"copyPath":"/tmp/market"'), "f")).toThrow(
+    "Use a normalized project-relative destination root for copyPath",
+  );
+  expect(() => parseLock(lock(',"copy":true,"copyPath":"C:/market"'), "f")).toThrow(
+    "Use a normalized project-relative destination root for copyPath",
+  );
+  expect(() => parseLock(lock(',"copy":true,"copyPath":"skills\\\\market"'), "f")).toThrow(
+    "Use a normalized project-relative destination root for copyPath",
+  );
+  expect(() =>
+    parseLock(lock(',"copy":true,"agents":["claude"],"copyPath":"market"'), "f"),
+  ).toThrow("Set exactly one of agents or copyPath when copy is true");
+  expect(() => parseLock(lock(',"copyPath":"market"'), "f")).toThrow(
+    "Set copy to true when an entry contains agents or copyPath",
+  );
+  expect(parseLock(lock(',"copy":true,"copyPath":"."'), "f").skills["a"]!.copyPath).toBe(".");
+});
+
+test("placementOf reads exactly one placement from an entry", () => {
+  expect(placementOf(entry)).toEqual({ kind: "link" });
+  expect(placementOf({ ...entry, copy: true, agents: ["claude"] })).toEqual({
+    kind: "agent-copy",
+    agents: ["claude"],
+  });
+  expect(placementOf({ ...entry, copy: true, copyPath: "custom-directory" })).toEqual({
+    kind: "path-copy",
+    copyPath: "custom-directory",
+  });
+});
+
 test("a lockfile carrying installedAt loads without it and re-serializes without it", () => {
   const text = `{"lockfileVersion":1,"skills":{"tdd":{"source":"r","path":"","integrity":"${integrity}","track":"auto","installedAt":"2026-08-03T12:00:00Z"}}}`;
   const parsed = parseLock(text, "ski-lock.json");
   expect(parsed.skills["tdd"]).toEqual({ source: "r", path: "", integrity, track: "auto" });
   expect(serializeLock(parsed)).not.toContain("installedAt");
+});
+
+test("readLock rejects path copies in global scope and symlink escapes in project scope", async () => {
+  const pathEntry = { ...entry, copy: true as const, copyPath: "published" };
+  await writeLock("global", { lockfileVersion: 1, skills: { demo: pathEntry } });
+  await expect(readLock("global")).rejects.toThrow("path copies require project scope");
+
+  const root = join(tmp, "unsafe-lock-project");
+  const outside = join(tmp, "unsafe-lock-outside");
+  await mkdir(join(root, ".git"), { recursive: true });
+  await mkdir(outside, { recursive: true });
+  await symlink(outside, join(root, "published"));
+  await inDir(root, async () => {
+    await writeFile(
+      join(root, "ski-lock.json"),
+      serializeLock({
+        lockfileVersion: 1,
+        skills: { demo: pathEntry },
+      }),
+    );
+    await expect(readLock("project")).rejects.toThrow("resolves outside the project root");
+  });
 });

@@ -26,7 +26,9 @@ Always prefer self-documented code over comments. Comment only when the code can
 
 ## Tests
 
-Tests import core and UI functions into one Bun process. The suite does not spawn the CLI, so command registration, argument wiring, and exit codes are checked by hand. Add a small `Bun.spawn` harness for `-y` paths when those checks become brittle or miss a bug.
+Tests import core and UI functions into one Bun process. `commands/path-copy.integration.test.ts` uses `Bun.spawn` to test the non-interactive path-copy flow through the option parser.
+
+Check every other command's registration, argument wiring, and exit codes by hand. Add a `-y` harness case when a manual check becomes unreliable.
 
 - Add unit tests for changed `core/` behavior. Network modules require tests.
 - Assert against literals, worked examples, fixtures, or documented contracts. Do not copy implementation logic into assertions.
