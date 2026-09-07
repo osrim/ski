@@ -31,6 +31,20 @@ Editing a linked skill changes it for every linked agent.
 
 In project scope, `.ski/.gitignore` keeps the skill directories out of Git. Links in the agents' skills directories are hidden with `.git/info/exclude`, in a block that `ski` rebuilds after every write. Commit `ski-lock.json`. Copies made with `--copy` can be committed.
 
+## Path copies
+
+`ski add --copy --path <directory>` writes each selected skill to `<directory>/<skill name>`. The destination root uses project scope.
+
+This command does not select or remember agents. Path copies remain visible to Git.
+
+`ski` resolves relative input from the project root, even when the command runs in a subdirectory. It accepts absolute input only inside the project root.
+
+`ski` records a normalized project-relative `copyPath`. It rejects traversal and symlinks that escape the project. `ski` repeats this check when it reads the lockfile.
+
+`ski` manages a named skill directory only when the lockfile contains a matching entry. `update` and an approved `install` may replace that directory.
+
+`remove` deletes the skill directory. It keeps the destination root and its other contents.
+
 ## Remembered choices
 
 When you pick a scope or agents in a prompt, or pass `-g`, `-p`, or `--agent`, `ski` remembers the choice in `config.json` and preselects it next time. A new choice replaces the remembered one. A config file that fails to parse is ignored.
@@ -74,7 +88,9 @@ The store is a download cache. A lockfile entry installs without the network whe
       "path": "skills/pdf",
       "commit": "474e3e791559398762c4f5eff1399efe8f402156",
       "integrity": "sha256-Y7e8N/hx+rfGdAq0eQxb/7nXc6OLzBdbqVICpPivokY=",
-      "track": "auto"
+      "track": "auto",
+      "copy": true,
+      "copyPath": "custom-directory"
     }
   }
 }
@@ -91,7 +107,12 @@ The store is a download cache. A lockfile entry installs without the network whe
 | `tag` | Installed tag. |
 | `pinnedAs` | The ref you typed after `@`, when it is not a branch or commit. |
 | `copy` | `true` when the skill was added with `--copy`. |
-| `agents` | Agents that received a copy. Link entries do not record agents. |
+| `agents` | Agents that received an agent copy. Link and path-copy entries do not record agents. |
+| `copyPath` | Normalized project-relative destination root for a path copy. |
+
+A copy entry has exactly one placement: a non-empty `agents` array or `copyPath`. Link entries have neither. Lockfile version 1 remains in use.
+
+Releases without path-copy support reject these entries because `copy: true` has no `agents` field.
 
 ## Environment variables
 

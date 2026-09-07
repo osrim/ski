@@ -30,6 +30,10 @@ Using project scope. Use -g for global.
 Linking to claude.
 ```
 
+`--path` selects project scope and a destination root. It prints no scope or agent default.
+
+`install` selects agents only when the lockfile has link entries. A lockfile that contains only copies prints no agent default.
+
 ## Result lines
 
 Use `name: result` for one skill. Name the skill once. Put a remedy on the next line when there is one. Never print a stack trace.
@@ -37,6 +41,7 @@ Use `name: result` for one skill. Name the skill once. Put a remedy on the next 
 ```text
 grilling: installed @ v1.2.0
 grilling: restored @ v1.2.0
+grilling: removed from custom-directory/grilling
 grilling: source no longer has skills/grilling, skipped
 ```
 

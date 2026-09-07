@@ -1,8 +1,15 @@
 import * as p from "@clack/prompts";
-import type { AgentId } from "../core/install/agents.ts";
 import { skillPath } from "../core/install/link.ts";
 import { readLock, type LockEntry, type Lockfile } from "../core/install/lockfile.ts";
-import { installedSkills, modifiedSkills, locationsOf } from "../core/install/destination.ts";
+import {
+  installedSkills,
+  locationAgents,
+  locationDisplayPath,
+  locationPresent,
+  modifiedSkills,
+  locationsOf,
+  type Location,
+} from "../core/install/destination.ts";
 import { lockPath, type Scope } from "../core/paths.ts";
 import { displayLabel } from "../core/source/revision.ts";
 import { resolveScope, scopeFlag, type ScopeOptions } from "../core/install/scope.ts";
@@ -25,7 +32,7 @@ interface ListOptions extends ScopeOptions {
 interface ListRow {
   name: string;
   entry: LockEntry;
-  agents: AgentId[];
+  location: Location;
   modified: boolean;
 }
 
@@ -56,14 +63,19 @@ const buildRows = async (lock: Lockfile, scope: Scope): Promise<ListRow[]> => {
   return skills.map(({ name, ...entry }) => ({
     name,
     entry,
-    agents: locations.get(name)!.agents,
+    location: locations.get(name)!,
     modified: modified.has(name),
   }));
 };
 
-const agentsText = (row: ListRow): string => {
-  if (row.agents.length === 0) return "missing";
-  return row.entry.copy ? `${row.agents.join(", ")} ${dim("copy")}` : row.agents.join(", ");
+const locationText = (row: ListRow): string => {
+  const where = locationDisplayPath(row.name, row.location);
+  if (!locationPresent(row.location)) {
+    return row.location.kind === "path-copy"
+      ? `${where} ${dim("copy")} ${dim("(missing)")}`
+      : dim("missing");
+  }
+  return row.location.kind === "link" ? where : `${where} ${dim("copy")}`;
 };
 
 const nameLabel = (row: ListRow): string =>
@@ -80,7 +92,7 @@ const printRows = (rows: ListRow[]): void => {
         const cells = [
           pad(nameLabel(row), nameWidth),
           pad(displayLabel(row.entry), revWidth),
-          row.agents.length > 0 ? agentsText(row) : dim(agentsText(row)),
+          locationText(row),
         ];
         return `  ${cells.join("  ")}`;
       }),
@@ -89,7 +101,7 @@ const printRows = (rows: ListRow[]): void => {
 };
 
 const reportMissing = (rows: ListRow[]): void => {
-  const missing = rows.filter((row) => row.agents.length === 0);
+  const missing = rows.filter((row) => !locationPresent(row.location));
   if (missing.length === 0) return;
   p.log.info(
     `${missing.length} missing: ${missing.map((row) => skillName(row.name)).join(", ")}\nRun \`ski install\`.`,
@@ -106,7 +118,7 @@ const reportModifiedRows = (rows: ListRow[], scope: Scope): void => {
 };
 
 const summaryLine = (rows: ListRow[], scope: Scope): string => {
-  const missing = rows.filter((row) => row.agents.length === 0).length;
+  const missing = rows.filter((row) => !locationPresent(row.location)).length;
   const modified = rows.filter((row) => row.modified).length;
   const notes = [
     ...(missing > 0 ? [`${missing} missing`] : []),
@@ -130,8 +142,8 @@ const runJson = async (options: ListOptions): Promise<void> => {
         skills: rows.map((row) =>
           Object.assign({ name: row.name }, row.entry, {
             modified: row.modified,
-            agents: row.agents,
-            links: row.agents.map((agent) => skillPath(row.name, scope, agent)),
+            agents: locationAgents(row.location),
+            links: locationAgents(row.location).map((agent) => skillPath(row.name, scope, agent)),
           }),
         ),
       },

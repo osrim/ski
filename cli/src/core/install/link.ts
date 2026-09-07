@@ -1,10 +1,11 @@
-import { mkdir, rm, symlink, lstat, realpath, readlink, writeFile } from "node:fs/promises";
-import { existsSync, lstatSync } from "node:fs";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { mkdir, rm, symlink, lstat, readlink, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
 import { skillsDir, AGENTS, type AgentId } from "./agents.ts";
 import { writeFiles, type SkillFile } from "../skill/files.ts";
 import { integrityOfDir } from "../skill/integrity.ts";
 import { canonicalDir, childPath, dataDir, tildify, type Scope } from "../paths.ts";
+import { isInside, present, realpathOrNearest, unmanagedError } from "./target.ts";
 
 const isSymlinkPath = async (path: string): Promise<boolean> => {
   try {
@@ -13,22 +14,6 @@ const isSymlinkPath = async (path: string): Promise<boolean> => {
     return false;
   }
 };
-
-const present = (path: string): boolean => lstatSync(path, { throwIfNoEntry: false }) !== undefined;
-
-// Resolves the deepest existing ancestor so a link into a not-yet-created directory still compares.
-const realpathOrNearest = async (path: string): Promise<string> => {
-  try {
-    return await realpath(path);
-  } catch {
-    const parent = dirname(path);
-    if (parent === path) return path;
-    return join(await realpathOrNearest(parent), basename(path));
-  }
-};
-
-const isInside = (path: string, root: string): boolean =>
-  path === root || path.startsWith(`${root}/`);
 
 export const assertSkillsDirSafe = async (scope: Scope, agent: AgentId): Promise<string> => {
   const dest = skillsDir(scope, agent);
@@ -83,10 +68,7 @@ export const refuseUnmanaged = async (
   agent: AgentId,
 ): Promise<void> => {
   const path = skillPath(name, scope, agent);
-  if (!(await isUnmanaged(path, scope))) return;
-  throw new Error(
-    `${displayPath(path)} exists and is not managed by ski, skipped\nMove or delete it, then re-run.`,
-  );
+  if (await isUnmanaged(path, scope)) throw unmanagedError(displayPath(path));
 };
 
 export const linkedAgents = async (name: string, scope: Scope): Promise<AgentId[]> => {

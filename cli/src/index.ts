@@ -37,6 +37,10 @@ const buildCli = (): CAC => {
     .option("-y, --yes", "Skip ordinary confirmations")
     .option("--agent <id>", "Agents to install to: claude, opencode, universal. Repeatable")
     .option("--copy", "Copy directories instead of linking")
+    .option(
+      "--path <directory>",
+      "With --copy, write below a project destination root. Do not combine --path with -g or --agent",
+    )
     .action(async (coordinate, skills, options) =>
       (await LOADERS.add()).run(coordinate, skills, options),
     );

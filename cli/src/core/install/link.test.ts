@@ -208,7 +208,7 @@ test("a real dir at the target is refused, not clobbered", async () => {
 
   await writeCanonical("mine", files, "global");
   await expect(linkSkill("mine", "global", "claude")).rejects.toThrow(
-    "~/claude-home/skills/mine exists and is not managed by ski, skipped\nMove or delete it, then re-run.",
+    "ski skipped this skill because ~/claude-home/skills/mine exists but is unmanaged.\nMove or delete it, then run the command again.",
   );
   expect(await readFile(join(target, "SKILL.md"), "utf8")).toBe("the user's own skill\n");
 });
@@ -227,7 +227,7 @@ test("copySkill refuses a unmanaged dir, replaces a managed one in place", async
   const target = skillPath("copied", "global", "opencode");
   await writeFile(join(target, "notes.md"), "mine\n");
   await expect(copySkill("copied", files, "global", "opencode", false)).rejects.toThrow(
-    "is not managed by ski, skipped",
+    "exists but is unmanaged",
   );
   expect(await readFile(join(target, "notes.md"), "utf8")).toBe("mine\n");
 
@@ -260,7 +260,7 @@ test("a refusal names a path inside the project relative to it", async () => {
   try {
     await writeCanonical("tdd", files, "project");
     await expect(linkSkill("tdd", "project", "claude")).rejects.toThrow(
-      ".claude/skills/tdd exists and is not managed by ski, skipped\nMove or delete it, then re-run.",
+      "ski skipped this skill because .claude/skills/tdd exists but is unmanaged.\nMove or delete it, then run the command again.",
     );
   } finally {
     process.chdir(prev);
@@ -376,14 +376,14 @@ test("a symlink ski did not create is refused, not clobbered", async () => {
 
   await writeCanonical("borrowed", files, "global");
   await expect(linkSkill("borrowed", "global", "claude")).rejects.toThrow(
-    "is not managed by ski, skipped",
+    "exists but is unmanaged",
   );
   expect(await readlink(join(dir, "borrowed"))).toBe(theirs);
 
   expect(occupiedAgents("dangling", "global")).toEqual(["claude"]);
   await writeCanonical("dangling", files, "global");
   await expect(linkSkill("dangling", "global", "claude")).rejects.toThrow(
-    "is not managed by ski, skipped",
+    "exists but is unmanaged",
   );
   expect(await readlink(join(dir, "dangling"))).toBe(join(tmp, "never-existed"));
 });

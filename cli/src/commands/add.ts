@@ -1,7 +1,8 @@
 import * as p from "@clack/prompts";
 import { applySkill } from "../core/install/apply.ts";
 import { assertSkillsDirSafe } from "../core/install/link.ts";
-import { addDestination, type Mode } from "../core/install/destination.ts";
+import { addDestination } from "../core/install/destination.ts";
+import { normalizeCopyPath } from "../core/install/path-copy.ts";
 import type { DiscoveredSkill } from "../core/source/discover.ts";
 import type { SkillFile } from "../core/skill/files.ts";
 import { readLock, type Lockfile } from "../core/install/lockfile.ts";
@@ -21,7 +22,7 @@ import {
   type Source,
 } from "../core/source/index.ts";
 import { parseCoordinate, type Coordinate } from "../core/source/coordinate.ts";
-import { USAGE_ERROR } from "../core/usage.ts";
+import { usageError, USAGE_ERROR } from "../core/usage.ts";
 import { resolveDeps, type DepsContext } from "../ui/deps.ts";
 import { confirm, fetchSkillFiles, land, type SkillFiles } from "../ui/flow.ts";
 import { reviewSkills } from "../ui/gate.ts";
@@ -35,10 +36,12 @@ import {
   chooseScope,
   warnAncestorCollisions,
   warnScopeCollisions,
+  type Mode,
 } from "../ui/destination.ts";
 
 export const help: CommandHelp = {
-  description: "Fetch, review, and add skills. Use --copy to write directories instead of links.",
+  description:
+    "Fetch, review, and add skills. --copy writes directories instead of links. With --copy, --path <directory> writes skills below a project destination root. Do not combine --path with -g or --agent.",
   coordinate: [
     "owner/repo                        GitHub repository",
     "owner/repo/pdf                    named skill",
@@ -53,6 +56,7 @@ export const help: CommandHelp = {
     "$ ski add anthropics/skills/pdf -g",
     "$ ski add owner/repo@v1.2.0 --all -y",
     "$ ski add owner/repo/pdf --copy",
+    "$ ski add owner/repo --all -y --copy --path ./custom-directory",
   ],
 };
 
@@ -61,6 +65,7 @@ interface AddOptions extends ScopeOptions {
   yes?: boolean;
   agent?: string | string[];
   copy?: boolean;
+  path?: string;
 }
 
 const MODES = {
@@ -101,7 +106,7 @@ export const run = async (
   if (!fetched) return;
   const { rev, skills } = fetched;
 
-  const { scope, agents } = await chooseDestination(options, {
+  const { scope, agents, copyPath } = await chooseDestination(options, {
     where: mode.where,
     mode: mode.verb,
   });
@@ -116,7 +121,7 @@ export const run = async (
     agents,
     source: scopedSource,
     rev,
-    options: { all: options.all, copy },
+    options: { all: options.all, copy, copyPath },
   });
   if (picked.skills.length === 0 && picked.extend.length === 0) {
     p.outro(picked.asked ? "Nothing selected." : mode.nothingToDo);
@@ -148,10 +153,20 @@ export const run = async (
     return;
   }
 
-  if (scope === "project") warnAncestorCollisions(landing);
-  warnScopeCollisions(landing, scope, agents);
+  if (!copyPath && scope === "project") warnAncestorCollisions(landing);
+  if (!copyPath) warnScopeCollisions(landing, scope, agents);
 
-  const context = { source: scopedSource, rev, ref: parsed.ref, scope, agents, lock, copy, mode };
+  const context = {
+    source: scopedSource,
+    rev,
+    ref: parsed.ref,
+    scope,
+    agents,
+    copyPath,
+    lock,
+    copy,
+    mode,
+  };
   await land({
     items: [...approved, ...picked.extend],
     name: (item) => item.skill.name,
@@ -159,7 +174,7 @@ export const run = async (
       "files" in item ? addSkill(item.skill, item.files, context) : extendSkill(item, context),
     scope,
     lock,
-    outro: (added) => `Added ${added} skill(s). ${scope}: ${agents.join(", ")}.`,
+    outro: (added) => `Added ${added} skill(s). ${scope}: ${copyPath ?? agents.join(", ")}.`,
   });
 };
 
@@ -175,18 +190,29 @@ const parseCoordinateOrFail = (raw: string): Coordinate => {
 interface Destination {
   scope: Scope;
   agents: AgentId[];
+  copyPath: string | undefined;
 }
 
 const chooseDestination = async (
   options: AddOptions,
   prompts: { where: string; mode: Mode },
 ): Promise<Destination> => {
+  if (options.path !== undefined) {
+    if (!options.copy) throw usageError("Pass --copy with --path.");
+    if (options.global) throw usageError("Do not combine --path with --global.");
+    if (options.agent !== undefined) throw usageError("Do not combine --path with --agent.");
+    try {
+      return { scope: "project", agents: [], copyPath: await normalizeCopyPath(options.path) };
+    } catch (e) {
+      throw usageError((e as Error).message);
+    }
+  }
   const scope = await chooseScope(options, prompts.where);
   const agents = await chooseAgents(options, scope, prompts.mode);
   for (const agent of agents) {
     await assertSkillsDirSafe(scope, agent).catch((e: Error) => fail(e.message));
   }
-  return { scope, agents };
+  return { scope, agents, copyPath: undefined };
 };
 
 const shownLabel = (userRef: string | undefined, entry: Labelled): string =>
@@ -248,6 +274,7 @@ interface AddContext {
   ref: string | undefined;
   scope: Scope;
   agents: AgentId[];
+  copyPath: string | undefined;
   lock: Lockfile;
   copy: boolean;
   mode: (typeof MODES)[keyof typeof MODES];

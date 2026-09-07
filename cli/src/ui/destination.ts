@@ -15,7 +15,6 @@ import {
   type AgentId,
 } from "../core/install/agents.ts";
 import { readConfig, remember } from "../core/config.ts";
-import type { Mode } from "../core/install/destination.ts";
 import { syncExcludes } from "../core/install/exclude.ts";
 import { projectRoot, type Scope } from "../core/paths.ts";
 import { resolveScope, type ScopeOptions } from "../core/install/scope.ts";
@@ -60,6 +59,8 @@ export const chooseScope = async (
   await remember({ scope: picked });
   return picked;
 };
+
+export type Mode = "link" | "copy";
 
 const VERBS = {
   link: {

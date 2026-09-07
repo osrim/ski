@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import type { AgentId } from "./agents.ts";
 import type { SkillFile } from "../skill/files.ts";
-import type { Lockfile } from "./lockfile.ts";
+import type { LockEntry, Lockfile } from "./lockfile.ts";
 import {
   refuseUnmanaged,
   assertSkillsDirSafe,
@@ -13,6 +13,7 @@ import type { Scope } from "../paths.ts";
 import type { Revision } from "../source/revision.ts";
 import { readDirFiles } from "../skill/files.ts";
 import { entryMatches, materialize, storeEntryPath, type Materialized } from "./store.ts";
+import { pathCopyState, refuseUnmanagedPathCopy, writePathCopy } from "./path-copy.ts";
 
 interface ApplyPlan {
   name: string;
@@ -23,12 +24,11 @@ interface ApplyPlan {
   files: () => Promise<SkillFile[]>;
 }
 
-export interface Destination {
-  scope: Scope;
-  agents: AgentId[];
-  lock?: Lockfile;
-  copy?: { managed: AgentId[] };
-}
+export type Destination = { scope: Scope; lock?: Lockfile } & (
+  | { kind: "link"; agents: AgentId[] }
+  | { kind: "agent-copy"; agents: AgentId[]; managed: AgentId[] }
+  | { kind: "path-copy"; root: string; managed: boolean }
+);
 
 const ensureStoreEntry = async (
   plan: ApplyPlan,
@@ -44,36 +44,58 @@ const ensureStoreEntry = async (
   return { ...(await materialize(plan.source, plan.name, files, plan.integrity)), files };
 };
 
+const refuseAgentTargets = async (
+  name: string,
+  scope: Scope,
+  agents: AgentId[],
+  managed: AgentId[],
+): Promise<void> => {
+  for (const agent of agents) {
+    await assertSkillsDirSafe(scope, agent);
+    if (!managed.includes(agent)) await refuseUnmanaged(name, scope, agent);
+  }
+};
+
 export const applySkill = async (
   plan: ApplyPlan,
   destination: Destination,
 ): Promise<{ integrity: string; restored: boolean }> => {
-  const managedCopy = (agent: AgentId): boolean =>
-    destination.copy?.managed.includes(agent) === true;
-  // Refuse every unmanaged path up front so a failed skill leaves no canonical copy behind.
-  for (const agent of destination.agents) {
-    await assertSkillsDirSafe(destination.scope, agent);
-    if (!managedCopy(agent)) await refuseUnmanaged(plan.name, destination.scope, agent);
-  }
-  const { integrity, restored, files } = await ensureStoreEntry(plan);
-  if (!destination.copy) await writeCanonical(plan.name, files, destination.scope);
-  for (const agent of destination.agents) {
-    if (destination.copy) {
-      await copySkill(plan.name, files, destination.scope, agent, managedCopy(agent));
-    } else {
-      await linkSkill(plan.name, destination.scope, agent);
+  if (destination.kind === "path-copy") {
+    if (destination.scope !== "project") throw new Error("Path copies require project scope.");
+    if (!destination.managed) await refuseUnmanagedPathCopy(plan.name, destination.root);
+    if (destination.managed && plan.integrity !== undefined) {
+      const state = await pathCopyState(plan.name, plan.integrity, destination.root);
+      if (!state.missing && !state.modified) return { integrity: plan.integrity, restored: false };
     }
+  } else {
+    const managed = destination.kind === "agent-copy" ? destination.managed : [];
+    await refuseAgentTargets(plan.name, destination.scope, destination.agents, managed);
   }
-  if (destination.lock) {
-    destination.lock.skills[plan.name] = {
-      source: plan.source,
-      path: plan.path,
-      ...plan.revision,
-      integrity,
-      ...(destination.copy
-        ? { copy: true, agents: [...new Set([...destination.copy.managed, ...destination.agents])] }
-        : {}),
-    };
+
+  const { integrity, restored, files } = await ensureStoreEntry(plan);
+  const entry: LockEntry = {
+    source: plan.source,
+    path: plan.path,
+    ...plan.revision,
+    integrity,
+  };
+
+  if (destination.kind === "link") {
+    await writeCanonical(plan.name, files, destination.scope);
+    for (const agent of destination.agents) await linkSkill(plan.name, destination.scope, agent);
+  } else if (destination.kind === "agent-copy") {
+    const { agents, managed, scope } = destination;
+    for (const agent of agents) {
+      await copySkill(plan.name, files, scope, agent, managed.includes(agent));
+    }
+    Object.assign(entry, {
+      copy: true,
+      agents: [...new Set([...managed, ...agents])],
+    });
+  } else {
+    await writePathCopy(plan.name, files, destination.root, destination.managed);
+    Object.assign(entry, { copy: true, copyPath: destination.root });
   }
+  if (destination.lock) destination.lock.skills[plan.name] = entry;
   return { integrity, restored };
 };

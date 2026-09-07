@@ -1,11 +1,12 @@
-import {
-  assertSkillsDirSafe,
-  removeCanonical,
-  removeCopy,
-  unlinkSkill,
-} from "../core/install/link.ts";
+import { assertSkillsDirSafe } from "../core/install/link.ts";
 import { readLock } from "../core/install/lockfile.ts";
-import { installedSkills, locationsOf } from "../core/install/destination.ts";
+import {
+  installedSkills,
+  locationAgents,
+  locationDisplayPath,
+  locationsOf,
+  removeInstalledSkill,
+} from "../core/install/destination.ts";
 import { resolveScope, type ScopeOptions } from "../core/install/scope.ts";
 import { confirm, land } from "../ui/flow.ts";
 import type { CommandHelp } from "../ui/help.ts";
@@ -50,7 +51,7 @@ export const run = async (names: string[], options: RemoveOptions): Promise<void
     outro("Nothing selected.");
     return;
   }
-  const agents = new Set(selection.flatMap((name) => locations.get(name)!.agents));
+  const agents = new Set(selection.flatMap((name) => locationAgents(locations.get(name)!)));
   for (const agent of agents) {
     await assertSkillsDirSafe(scope, agent).catch((e: Error) => fail(e.message));
   }
@@ -69,13 +70,11 @@ export const run = async (names: string[], options: RemoveOptions): Promise<void
     items: selection,
     name: (name) => name,
     apply: async (name) => {
-      const { mode, agents: from } = locations.get(name)!;
-      for (const agent of from) {
-        await (mode === "copy" ? removeCopy(name, scope, agent) : unlinkSkill(name, scope, agent));
-      }
-      if (mode === "link") await removeCanonical(name, scope);
+      const location = locations.get(name)!;
+      await removeInstalledSkill(name, scope, location);
       delete lock.skills[name];
-      return { success: from.length > 0 ? `removed from ${from.join(", ")}` : "removed" };
+      const from = locationDisplayPath(name, location);
+      return { success: from ? `removed from ${from}` : "removed" };
     },
     scope,
     lock,

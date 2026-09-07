@@ -1,8 +1,8 @@
 import * as p from "@clack/prompts";
 import { applySkill, type Destination } from "../core/install/apply.ts";
 import { readLock, type Lockfile } from "../core/install/lockfile.ts";
-import { canonicalPath } from "../core/install/link.ts";
 import {
+  installedPath,
   installedSkills,
   modifiedSkills,
   updateDestination,
@@ -126,7 +126,7 @@ const destinationFor = async (
   lock: Lockfile,
 ): Promise<Destination> => {
   const { destination, defaulted } = await updateDestination(skill, scope, lock);
-  if (defaulted) {
+  if (defaulted && destination.kind === "link") {
     warn(`${skillName(skill.name)}: missing. Linking to ${destination.agents.join(", ")}.`);
   }
   return destination;
@@ -204,7 +204,7 @@ const previewAndReview = async (
     const { changes, files } = await withSpinner(
       `Reading ${skillName(skill.name)}`,
       async () => ({
-        changes: await verdict.source.changes(skill, to, canonicalPath(skill.name, scope)),
+        changes: await verdict.source.changes(skill, to, await installedPath(skill, scope)),
         files: await verdict.source.fetchFiles(to, skill.path),
       }),
       (read) => `${skillName(skill.name)}: read ${read.files.length} file(s)`,

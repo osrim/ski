@@ -1,9 +1,10 @@
 import { readFile, mkdir } from "node:fs/promises";
-import { dirname } from "node:path";
+import { dirname, posix, win32 } from "node:path";
 import writeFileAtomic from "write-file-atomic";
 import { z } from "zod";
 import { AGENT_IDS, type AgentId } from "./agents.ts";
 import { lockPath, type Scope } from "../paths.ts";
+import { pathCopyTarget } from "./path-copy.ts";
 
 export interface LockEntry {
   source: string;
@@ -16,12 +17,24 @@ export interface LockEntry {
   tag?: string;
   copy?: true;
   agents?: AgentId[];
+  copyPath?: string;
 }
 
 export interface Lockfile {
   lockfileVersion: 1;
   skills: Record<string, LockEntry>;
 }
+
+export type Placement =
+  | { kind: "link" }
+  | { kind: "agent-copy"; agents: AgentId[] }
+  | { kind: "path-copy"; copyPath: string };
+
+export const placementOf = (entry: LockEntry): Placement => {
+  if (entry.copyPath !== undefined) return { kind: "path-copy", copyPath: entry.copyPath };
+  if (entry.agents !== undefined) return { kind: "agent-copy", agents: entry.agents };
+  return { kind: "link" };
+};
 
 export const emptyLock = (): Lockfile => ({ lockfileVersion: 1, skills: {} });
 
@@ -50,6 +63,7 @@ interface SerializedEntry {
   tag?: string | undefined;
   copy?: true | undefined;
   agents?: AgentId[] | undefined;
+  copyPath?: string | undefined;
 }
 
 export const serializeLock = (lock: Lockfile): string => {
@@ -67,6 +81,7 @@ export const serializeLock = (lock: Lockfile): string => {
       tag: entry.tag,
       copy: entry.copy,
       agents: entry.agents,
+      copyPath: entry.copyPath,
     };
   }
   return `${JSON.stringify({ lockfileVersion: 1, skills }, null, 2)}\n`;
@@ -92,10 +107,29 @@ const EntrySchema = z
       .array(z.enum(AGENT_IDS))
       .nonempty({ error: "agents must name at least one agent" })
       .optional(),
+    copyPath: z
+      .string()
+      .refine(
+        (path) =>
+          path === "." ||
+          (!path.includes("\\") &&
+            !posix.isAbsolute(path) &&
+            !win32.isAbsolute(path) &&
+            path.split("/").every((segment) => !["", ".", ".."].includes(segment))),
+        { error: "Use a normalized project-relative destination root for copyPath" },
+      )
+      .optional(),
   })
-  .refine((entry) => (entry.copy === undefined) === (entry.agents === undefined), {
-    error: "copy and agents must appear together",
-  });
+  .refine(
+    (entry) =>
+      entry.copy !== undefined || (entry.agents === undefined && entry.copyPath === undefined),
+    { error: "Set copy to true when an entry contains agents or copyPath" },
+  )
+  .refine(
+    (entry) =>
+      entry.copy === undefined || (entry.agents === undefined) !== (entry.copyPath === undefined),
+    { error: "Set exactly one of agents or copyPath when copy is true" },
+  );
 
 // One path segment: not empty, not `.` or `..`, no separator. Looser than STANDARD_NAME in
 // source/discover.ts, which only warns: fallback names such as `My_Skill` still install.
@@ -139,6 +173,7 @@ export const parseLock = (text: string, file: string): Lockfile => {
       ...(entry.tag === undefined ? {} : { tag: entry.tag }),
       ...(entry.copy === undefined ? {} : { copy: entry.copy }),
       ...(entry.agents === undefined ? {} : { agents: entry.agents }),
+      ...(entry.copyPath === undefined ? {} : { copyPath: entry.copyPath }),
     };
   }
   return { lockfileVersion: 1, skills };
@@ -147,7 +182,17 @@ export const parseLock = (text: string, file: string): Lockfile => {
 export const readLock = async (scope: Scope): Promise<Lockfile> => {
   const file = lockPath(scope);
   try {
-    return parseLock(await readFile(file, "utf8"), file);
+    const lock = parseLock(await readFile(file, "utf8"), file);
+    for (const [name, entry] of Object.entries(lock.skills)) {
+      if (!entry.copyPath) continue;
+      if (scope === "global") {
+        throw new Error(`${file}: ${name}: path copies require project scope`);
+      }
+      await pathCopyTarget(name, entry.copyPath).catch((e: Error) => {
+        throw new Error(`${file}: ${name}: ${e.message}`, { cause: e });
+      });
+    }
+    return lock;
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
     return emptyLock();
