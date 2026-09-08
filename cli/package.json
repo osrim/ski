@@ -1,5 +1,5 @@
 {
-	"name": "osrim/ski",
+	"name": "@ski/cli",
 	"version": "0.2.0",
 	"private": true,
 	"description": "Skill manager for coding agents",
