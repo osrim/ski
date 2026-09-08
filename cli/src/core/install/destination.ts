@@ -63,9 +63,10 @@ export const locationsOf = async (
 ): Promise<Map<string, Location>> =>
   new Map(
     await Promise.all(
-      skills.map(
-        async (skill): Promise<[string, Location]> => [skill.name, await locationOf(skill, scope)],
-      ),
+      skills.map(async (skill): Promise<[string, Location]> => [
+        skill.name,
+        await locationOf(skill, scope),
+      ]),
     ),
   );
 
