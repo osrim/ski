@@ -9,7 +9,7 @@ index.ts -> commands -> ui -> core
                     \------> core
 ```
 
-- `index.ts` registers commands, renders root help, starts the update check for commands that use the network, and turns argument and top-level errors into exit codes.
+- `index.ts` registers commands, renders root help, starts the update check for every run, and turns argument and top-level errors into exit codes.
 - `commands/` owns each command's policy and sequence. A prompt or spinner used by one command only may live in that command.
 - `ui/` holds terminal behavior shared by commands: prompts, the review gate, reports, styling, per-skill progress, and exit status for UI failures.
 - `core/` implements behavior with no terminal input, terminal output, or process exit.

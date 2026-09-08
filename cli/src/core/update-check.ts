@@ -2,6 +2,7 @@ import { realpathSync } from "node:fs";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import * as find from "empathic/find";
+import { z } from "zod";
 import { cacheDir } from "./paths.ts";
 import { isNewerVersion } from "./source/semver.ts";
 
@@ -9,20 +10,24 @@ const LATEST_RELEASE_URL = "https://api.github.com/repos/osrim/ski/releases/late
 const TTL_MS = 24 * 60 * 60 * 1000;
 const TIMEOUT_MS = 1500;
 
-const stampFile = (): string => join(cacheDir(), "last-update-check");
+const CacheSchema = z.object({ checkedAt: z.number(), latest: z.string() });
 
-const checkedRecently = async (): Promise<boolean> => {
+const cacheFile = (): string => join(cacheDir(), "last-update-check");
+
+const readCache = async (): Promise<z.infer<typeof CacheSchema> | null> => {
   try {
-    const stamp = Number.parseInt(await readFile(stampFile(), "utf8"), 10);
-    return Number.isFinite(stamp) && Date.now() - stamp < TTL_MS;
+    const parsed = CacheSchema.safeParse(JSON.parse(await readFile(cacheFile(), "utf8")));
+    return parsed.success ? parsed.data : null;
   } catch {
-    return false;
+    return null;
   }
 };
 
-export const markUpToDate = async (): Promise<void> => {
-  await mkdir(cacheDir(), { recursive: true });
-  await writeFile(stampFile(), String(Date.now()));
+const writeCache = async (latest: string): Promise<void> => {
+  try {
+    await mkdir(cacheDir(), { recursive: true });
+    await writeFile(cacheFile(), JSON.stringify({ checkedAt: Date.now(), latest }));
+  } catch {}
 };
 
 const inGitCheckout = (): boolean => find.up(".git", { cwd: import.meta.dir }) !== undefined;
@@ -63,10 +68,17 @@ export const startUpdateCheck = async (
   currentVersion: string,
   json: boolean,
 ): Promise<string | null> => {
-  if (silenced(json) || (await checkedRecently())) return null;
-  const latest = await latestVersion();
-  if (!latest) return null;
-  await markUpToDate();
-  if (!isNewerVersion(latest, currentVersion)) return null;
+  if (silenced(json)) return null;
+  const cached = await readCache();
+  let latest = cached?.latest ?? null;
+  const age = cached ? Date.now() - cached.checkedAt : Infinity;
+  if (age < 0 || age >= TTL_MS) {
+    const fetched = await latestVersion();
+    if (fetched) {
+      await writeCache(fetched);
+      latest = fetched;
+    }
+  }
+  if (!latest || !isNewerVersion(latest, currentVersion)) return null;
   return `Update available: ${currentVersion} → ${latest}\n${upgradeHint(process.execPath)}`;
 };

@@ -180,7 +180,7 @@ install -m 755 ski /usr/local/bin/ski
 ski install --agent claude --yes
 ```
 
-`git` must be on `PATH`. `ski install` exits `0` when every entry in `ski-lock.json` is on disk with its recorded integrity. `CI` disables the update notice.
+`git` must be on `PATH`. `ski install` exits `0` when every entry in `ski-lock.json` is on disk with its recorded integrity. `CI` disables the update notice and its release check.
 
 `ski add` and `ski update` also run without a terminal. `--yes` accepts warn findings. A critical finding exits `3` unless `--dangerous-skip-critical-approval` skips approval. `ski list --json` prints machine-readable output.
 

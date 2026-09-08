@@ -4,9 +4,10 @@ import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { captureEnv } from "../test-env.ts";
-import { markUpToDate, startUpdateCheck, upgradeHint } from "./update-check.ts";
+import { startUpdateCheck, upgradeHint } from "./update-check.ts";
 
 const NOW = Date.UTC(2026, 7, 24, 12);
+const TTL_MS = 24 * 60 * 60 * 1000;
 const LATEST_RELEASE_URL = "https://api.github.com/repos/osrim/ski/releases/latest";
 
 let tmp: string;
@@ -21,7 +22,17 @@ let execPathDescriptor: PropertyDescriptor | undefined;
 let fetchDescriptor: PropertyDescriptor;
 let fetchMock: ReturnType<typeof mock>;
 
-const stampPath = (): string => join(process.env.XDG_CACHE_HOME!, "ski", "last-update-check");
+const cachePath = (): string => join(process.env.XDG_CACHE_HOME!, "ski", "last-update-check");
+
+const readCache = async (): Promise<unknown> => JSON.parse(await readFile(cachePath(), "utf8"));
+
+const writeCache = async (content: string): Promise<void> => {
+  await mkdir(join(process.env.XDG_CACHE_HOME!, "ski"), { recursive: true });
+  await writeFile(cachePath(), content);
+};
+
+const cacheEntry = (checkedAt: number, latest: string): string =>
+  JSON.stringify({ checkedAt, latest });
 
 const latestRelease = (tag_name: unknown, status = 200): Response =>
   Response.json({ tag_name }, { status });
@@ -75,7 +86,7 @@ test("a newer release returns the update notice and records the check", async ()
     headers: { Accept: "application/vnd.github+json" },
     signal: expect.any(AbortSignal),
   });
-  expect(await readFile(stampPath(), "utf8")).toBe(String(NOW));
+  expect(await readCache()).toEqual({ checkedAt: NOW, latest: "1.2.0" });
 });
 
 test("the upgrade hint names brew only for a Cellar binary", () => {
@@ -97,24 +108,66 @@ test("the upgrade hint resolves a symlink into the Cellar", async () => {
 test("an up-to-date version is silent but still records the completed check", async () => {
   fetchMock.mockResolvedValueOnce(latestRelease("v1.1.0"));
   expect(await startUpdateCheck("1.1.0", false)).toBeNull();
-  expect(await readFile(stampPath(), "utf8")).toBe(String(NOW));
+  expect(await readCache()).toEqual({ checkedAt: NOW, latest: "1.1.0" });
 });
 
-test("a recent stamp skips the request", async () => {
-  await markUpToDate();
+test("a fresh cache with a newer version returns the notice without a request", async () => {
+  await writeCache(cacheEntry(NOW - TTL_MS + 1, "1.2.0"));
+  expect(await startUpdateCheck("1.1.0", false)).toBe(
+    "Update available: 1.1.0 → 1.2.0\nDownload it from https://github.com/osrim/ski/releases/latest",
+  );
+  expect(fetchMock).not.toHaveBeenCalled();
+});
+
+test.each([
+  ["equal", "1.1.0"],
+  ["older", "1.0.0"],
+])("a fresh cache with an %s version is silent without a request", async (_name, latest) => {
+  await writeCache(cacheEntry(NOW, latest));
   expect(await startUpdateCheck("1.1.0", false)).toBeNull();
   expect(fetchMock).not.toHaveBeenCalled();
 });
 
-test("an expired or invalid stamp permits another check", async () => {
-  await markUpToDate();
-  await writeFile(stampPath(), String(NOW - 24 * 60 * 60 * 1000));
+test("a stale cache triggers one request and rewrites both fields", async () => {
+  await writeCache(cacheEntry(NOW - TTL_MS, "1.2.0"));
+  fetchMock.mockResolvedValueOnce(latestRelease("v1.3.0"));
+  expect(await startUpdateCheck("1.1.0", false)).toContain("1.1.0 → 1.3.0");
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(await readCache()).toEqual({ checkedAt: NOW, latest: "1.3.0" });
+});
+
+test("a cache checked in the future triggers one request and rewrites both fields", async () => {
+  await writeCache(cacheEntry(NOW + 1, "1.2.0"));
+  fetchMock.mockResolvedValueOnce(latestRelease("v1.3.0"));
+  expect(await startUpdateCheck("1.1.0", false)).toContain("1.1.0 → 1.3.0");
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(await readCache()).toEqual({ checkedAt: NOW, latest: "1.3.0" });
+});
+
+test.each([
+  ["a bare timestamp", String(NOW)],
+  ["invalid JSON", "not-a-time"],
+  ["a missing field", JSON.stringify({ checkedAt: NOW })],
+])("%s in the cache counts as no prior check", async (_name, content) => {
+  await writeCache(content);
   expect(await startUpdateCheck("1.1.0", false)).not.toBeNull();
   expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(await readCache()).toEqual({ checkedAt: NOW, latest: "1.2.0" });
+});
 
-  await writeFile(stampPath(), "not-a-time");
-  expect(await startUpdateCheck("1.1.0", false)).not.toBeNull();
-  expect(fetchMock).toHaveBeenCalledTimes(2);
+test("a failed request keeps the cached notice and leaves the cache untouched", async () => {
+  const stale = cacheEntry(NOW - TTL_MS, "1.2.0");
+  await writeCache(stale);
+  fetchMock.mockRejectedValueOnce(new Error("offline"));
+  expect(await startUpdateCheck("1.1.0", false)).toContain("1.1.0 → 1.2.0");
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(await readFile(cachePath(), "utf8")).toBe(stale);
+});
+
+test("an unwritable cache still returns the notice", async () => {
+  await mkdir(cachePath(), { recursive: true });
+  expect(await startUpdateCheck("1.1.0", false)).toContain("1.1.0 → 1.2.0");
+  expect(fetchMock).toHaveBeenCalledTimes(1);
 });
 
 test.each([
@@ -170,11 +223,11 @@ test.each([
 ])("%s fails silently without recording a check", async (_name, response) => {
   fetchMock.mockResolvedValueOnce(response());
   expect(await startUpdateCheck("1.1.0", false)).toBeNull();
-  expect(readFile(stampPath(), "utf8")).rejects.toThrow();
+  expect(readFile(cachePath(), "utf8")).rejects.toThrow();
 });
 
 test("a rejected request fails silently without recording a check", async () => {
   fetchMock.mockRejectedValueOnce(new Error("offline"));
   expect(await startUpdateCheck("1.1.0", false)).toBeNull();
-  expect(readFile(stampPath(), "utf8")).rejects.toThrow();
+  expect(readFile(cachePath(), "utf8")).rejects.toThrow();
 });
