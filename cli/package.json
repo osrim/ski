@@ -33,9 +33,9 @@
 	},
 	"devDependencies": {
 		"@types/bun": "latest",
-		"@types/write-file-atomic": "^4.0.3",
-		"oxfmt": "^0.66.0",
-		"oxlint": "^1.69.0",
-		"typescript": "^6"
+		"@types/write-file-atomic": "4.0.3",
+		"oxfmt": "0.66.0",
+		"oxlint": "1.81.0",
+		"typescript": "6.0.3"
 	}
 }
