@@ -134,11 +134,30 @@ jobs:
         run: |
           if gh release view "$TAG" > /dev/null 2>&1; then
             gh release upload "$TAG" dist/*.tar.gz dist/checksums.txt --clobber
-          else
-            args=(--generate-notes)
-            case "$TAG" in *-*) args+=(--prerelease) ;; esac
-            gh release create "$TAG" dist/*.tar.gz dist/checksums.txt "${args[@]}"
+            exit 0
           fi
+          args=(--generate-notes)
+          intro="[Homebrew](https://brew.sh), on macOS or Linux:
+
+          \`\`\`sh
+          brew install osrim/tap/ski
+          \`\`\`
+
+          Or download"
+          case "$TAG" in *-*)
+            args+=(--prerelease)
+            intro="Prereleases are not in Homebrew. Download"
+          esac
+          # Prepended to the generated notes. Mirrors the README install section, pinned to this tag.
+          notes=$(cat <<EOF
+          ## Install
+
+          $intro the archive for your platform below and put \`ski\` on your \`PATH\`. \`ski\` needs \`git\`.
+
+          > For CI, see [Commands](https://github.com/osrim/ski/blob/$TAG/docs/commands.md#ci).
+          EOF
+          )
+          gh release create "$TAG" dist/*.tar.gz dist/checksums.txt "${args[@]}" --notes "$notes"
 
       # Last: the asset must be public before the formula points at it.
       - name: Update the Homebrew tap
