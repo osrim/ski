@@ -121,30 +121,40 @@ test("add --copy --path writes every skill below the destination root and record
   expect(lock.skills.alpha.agents).toBeUndefined();
 });
 
-test("an approved dependency uses the same path-copy destination root", async () => {
-  const project = join(tmp, "dependency-project");
-  const sourceDir = join(tmp, "dependency-source");
-  await mkdir(join(project, ".git"), { recursive: true });
-  await makeSkill(sourceDir, "primary", "Use /helper.\n");
-  await makeSkill(sourceDir, "helper");
+test.each([false, true])(
+  "an approved dependency uses the same path-copy destination root, critical: %s",
+  async (critical) => {
+    const project = join(tmp, `dependency-project-${critical}`);
+    const sourceDir = join(tmp, `dependency-source-${critical}`);
+    await mkdir(join(project, ".git"), { recursive: true });
+    await makeSkill(sourceDir, "primary", "Use /helper.\n");
+    await makeSkill(sourceDir, "helper");
+    if (critical) await writeFile(join(sourceDir, "helper", "hooks.json"), "{}\n");
 
-  const result = await runInteractiveCli(
-    project,
-    "add",
-    sourceDir,
-    "primary",
-    "--copy",
-    "--path",
-    "published",
-  );
+    const result = await runInteractiveCli(
+      project,
+      "add",
+      sourceDir,
+      "primary",
+      "--copy",
+      "--path",
+      "published",
+      ...(critical ? ["--dangerous-skip-critical-approval"] : []),
+    );
 
-  expect(result.exitCode).toBe(0);
-  expect(existsSync(join(project, "published", "primary", "SKILL.md"))).toBe(true);
-  expect(existsSync(join(project, "published", "helper", "SKILL.md"))).toBe(true);
-  const lock = JSON.parse(await readFile(join(project, "ski-lock.json"), "utf8"));
-  expect(lock.skills.primary).toMatchObject({ copy: true, copyPath: "published" });
-  expect(lock.skills.helper).toMatchObject({ copy: true, copyPath: "published" });
-});
+    expect(result.exitCode).toBe(0);
+    expect(existsSync(join(project, "published", "primary", "SKILL.md"))).toBe(true);
+    expect(existsSync(join(project, "published", "helper", "SKILL.md"))).toBe(true);
+    const lock = JSON.parse(await readFile(join(project, "ski-lock.json"), "utf8"));
+    expect(lock.skills.primary).toMatchObject({ copy: true, copyPath: "published" });
+    expect(lock.skills.helper).toMatchObject({ copy: true, copyPath: "published" });
+    if (critical) {
+      expect(result.stdout).toContain("critical");
+      expect(result.stdout).toContain("hooks.json");
+      expect(result.stdout).not.toContain("Approve helper with");
+    }
+  },
+);
 
 test("--path reports invalid combinations and escaping destinations as usage errors", async () => {
   const project = join(tmp, "usage-project");
@@ -296,34 +306,40 @@ test("remove deletes only the managed skill directory below a destination root",
   expect(lock.skills).toEqual({});
 });
 
-test("an unmanaged path collision skips one skill while the rest of the batch lands", async () => {
-  const project = join(tmp, "collision-project");
-  const source = join(tmp, "collision-source");
-  await mkdir(join(project, ".git"), { recursive: true });
-  await makeSkill(source, "alpha");
-  await makeSkill(source, "beta");
-  await mkdir(join(project, "published", "alpha"), { recursive: true });
-  await writeFile(join(project, "published", "alpha", "mine.txt"), "mine\n");
+test.each([false, true])(
+  "an unmanaged path collision skips one skill while the rest of the batch lands, critical: %s",
+  async (critical) => {
+    const project = join(tmp, `collision-project-${critical}`);
+    const source = join(tmp, `collision-source-${critical}`);
+    await mkdir(join(project, ".git"), { recursive: true });
+    await makeSkill(source, "alpha");
+    await makeSkill(source, "beta");
+    if (critical) await writeFile(join(source, "beta", "hooks.json"), "{}\n");
+    await mkdir(join(project, "published", "alpha"), { recursive: true });
+    await writeFile(join(project, "published", "alpha", "mine.txt"), "mine\n");
 
-  const result = await runCli(
-    project,
-    "add",
-    source,
-    "--copy",
-    "--path",
-    "published",
-    "--all",
-    "--yes",
-  );
-  expect(result.exitCode).toBe(1);
-  expect(result.stderr).toContain("exists but is unmanaged");
-  expect(await readFile(join(project, "published", "alpha", "mine.txt"), "utf8")).toBe("mine\n");
-  expect(await readFile(join(project, "published", "beta", "SKILL.md"), "utf8")).toContain(
-    "name: beta",
-  );
-  const lock = JSON.parse(await readFile(join(project, "ski-lock.json"), "utf8"));
-  expect(Object.keys(lock.skills)).toEqual(["beta"]);
-});
+    const result = await runCli(
+      project,
+      "add",
+      source,
+      "--copy",
+      "--path",
+      "published",
+      "--all",
+      "--yes",
+      ...(critical ? ["--dangerous-skip-critical-approval"] : []),
+    );
+    expect(result.exitCode).toBe(1);
+    if (critical) expect(result.stdout).toContain("critical");
+    expect(result.stderr).toContain("exists but is unmanaged");
+    expect(await readFile(join(project, "published", "alpha", "mine.txt"), "utf8")).toBe("mine\n");
+    expect(await readFile(join(project, "published", "beta", "SKILL.md"), "utf8")).toContain(
+      "name: beta",
+    );
+    const lock = JSON.parse(await readFile(join(project, "ski-lock.json"), "utf8"));
+    expect(Object.keys(lock.skills)).toEqual(["beta"]);
+  },
+);
 
 test("changing a path copy to an agent copy requires remove then add", async () => {
   const project = join(tmp, "placement-project");
@@ -404,4 +420,116 @@ test("a critical finding blocks a non-interactive path copy with exit code 3", a
   expect(result.exitCode).toBe(3);
   expect(result.stdout).toContain("critical");
   expect(existsSync(join(project, "published", "dangerous"))).toBe(false);
+});
+
+test("the dangerous flag writes a path copy while retaining critical findings", async () => {
+  const project = join(tmp, "skip-critical-project");
+  const source = join(tmp, "skip-critical-source");
+  await mkdir(join(project, ".git"), { recursive: true });
+  await makeSkill(source, "dangerous");
+  await writeFile(join(source, "dangerous", "hooks.json"), "{}\n");
+
+  const result = await runCli(
+    project,
+    "add",
+    source,
+    "--copy",
+    "--path",
+    "published",
+    "--all",
+    "--yes",
+    "--dangerous-skip-critical-approval",
+  );
+
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout).toContain("critical");
+  expect(result.stdout).toContain("hooks.json");
+  expect(result.stdout).toContain("2 file(s)");
+  expect(await readFile(join(project, "published", "dangerous", "hooks.json"), "utf8")).toBe(
+    "{}\n",
+  );
+  const lock = JSON.parse(await readFile(join(project, "ski-lock.json"), "utf8"));
+  expect(lock.skills.dangerous).toMatchObject({ copy: true, copyPath: "published" });
+  expect(JSON.stringify(lock)).not.toContain("dangerousSkipCriticalApproval");
+});
+
+test("a path-copy update needs a fresh critical approval override on each invocation", async () => {
+  const project = join(tmp, "critical-update-project");
+  const source = join(tmp, "critical-update-source");
+  await mkdir(join(project, ".git"), { recursive: true });
+  await makeSkill(source, "demo", "version one\n");
+  expect(
+    (await runCli(project, "add", source, "--copy", "--path", "published", "--all", "--yes"))
+      .exitCode,
+  ).toBe(0);
+  const installed = join(project, "published", "demo", "SKILL.md");
+  const lockPath = join(project, "ski-lock.json");
+  const beforeFile = await readFile(installed, "utf8");
+  const beforeLock = await readFile(lockPath, "utf8");
+  await makeSkill(source, "demo", "version two\n");
+  await writeFile(join(source, "demo", "hooks.json"), "{}\n");
+
+  const blocked = await runCli(project, "update", "--all", "--yes");
+  expect(blocked.exitCode).toBe(3);
+  expect(await readFile(installed, "utf8")).toBe(beforeFile);
+  expect(await readFile(lockPath, "utf8")).toBe(beforeLock);
+  expect(existsSync(join(project, "published", "demo", "hooks.json"))).toBe(false);
+
+  const unconfirmed = await runCli(
+    project,
+    "update",
+    "--all",
+    "--dangerous-skip-critical-approval",
+  );
+  expect(unconfirmed.exitCode).toBe(2);
+  expect(unconfirmed.stderr).toContain("Pass -y to proceed.");
+  expect(await readFile(installed, "utf8")).toBe(beforeFile);
+  expect(await readFile(lockPath, "utf8")).toBe(beforeLock);
+
+  const updated = await runCli(
+    project,
+    "update",
+    "--all",
+    "--yes",
+    "--dangerous-skip-critical-approval",
+  );
+  expect(updated.exitCode).toBe(0);
+  expect(updated.stdout).toContain("critical");
+  expect(updated.stdout).toContain("hooks.json");
+  expect(await readFile(installed, "utf8")).toContain("version two");
+  expect(await readFile(join(project, "published", "demo", "hooks.json"), "utf8")).toBe("{}\n");
+  const updatedLock = await readFile(lockPath, "utf8");
+  expect(JSON.parse(updatedLock).skills.demo.integrity).not.toBe(
+    JSON.parse(beforeLock).skills.demo.integrity,
+  );
+  expect(updatedLock).not.toContain("dangerousSkipCriticalApproval");
+
+  await makeSkill(source, "demo", "version three\n");
+  expect((await runCli(project, "update", "--all", "--yes")).exitCode).toBe(3);
+  expect(await readFile(installed, "utf8")).toContain("version two");
+  expect(await readFile(lockPath, "utf8")).toBe(updatedLock);
+});
+
+test("the dangerous flag does not confirm a path-copy write", async () => {
+  const project = join(tmp, "unconfirmed-critical-project");
+  const source = join(tmp, "unconfirmed-critical-source");
+  await mkdir(join(project, ".git"), { recursive: true });
+  await makeSkill(source, "demo");
+  await writeFile(join(source, "demo", "hooks.json"), "{}\n");
+
+  const result = await runCli(
+    project,
+    "add",
+    source,
+    "--copy",
+    "--path",
+    "published",
+    "--all",
+    "--dangerous-skip-critical-approval",
+  );
+  expect(result.exitCode).toBe(2);
+  expect(result.stdout).toContain("critical");
+  expect(result.stderr).toContain("Pass -y to proceed.");
+  expect(existsSync(join(project, "published", "demo"))).toBe(false);
+  expect(existsSync(join(project, "ski-lock.json"))).toBe(false);
 });

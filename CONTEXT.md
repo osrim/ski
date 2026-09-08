@@ -84,13 +84,13 @@ Use these terms in code, docs, and output.
 | scan | Local pass that returns findings. | audit, check, lint |
 | rule | Named check the scan runs. Every finding cites one rule. | check, pattern, detector |
 | finding | Scan result with `info`, `warn`, or `critical` severity. | issue, violation, alert |
-| critical finding | Result that needs human approval. | error, failure |
+| critical finding | Result that needs human approval unless the invocation skips critical approval. | error, failure |
 | warn finding | Result that pauses for review unless `-y` is set. | warning, minor finding |
 | review | One skill's pass through the gate: file list, scan, findings, and at most one question. | audit, verify, validate |
 | gate | UI that shows findings and asks for approval. | prompt, confirmation, checkpoint |
 | approval | Human approval for one source, path, integrity, and scope. | trust, waiver, allowlist entry |
 | declined | The user answered no at the gate. The skill is skipped. | rejected, refused |
-| blocked | Critical findings with no terminal to approve them. The skill is skipped and the command exits `3`. | refused, rejected |
+| blocked | Critical findings with no terminal to approve them and no flag to skip approval. The skill is skipped and the command exits `3`. | refused, rejected |
 | skipped | Skill the command did not write: declined, blocked, modified without consent, or failed. | ignored, omitted |
 
 ## Agents

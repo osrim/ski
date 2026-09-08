@@ -19,7 +19,7 @@ import {
 } from "../core/source/upstream.ts";
 import { reportUpdateDeps, type UpdatedFiles } from "../ui/deps.ts";
 import { confirm, land } from "../ui/flow.ts";
-import { reviewSkills } from "../ui/gate.ts";
+import { reviewSkills, type ReviewOptions } from "../ui/gate.ts";
 import type { CommandHelp } from "../ui/help.ts";
 import { pickUpdates } from "../ui/pick.ts";
 import { fail, withSpinner } from "../ui/prompt.ts";
@@ -38,9 +38,8 @@ export const help: CommandHelp = {
   ],
 };
 
-interface UpdateOptions extends ScopeOptions {
+interface UpdateOptions extends ScopeOptions, ReviewOptions {
   all?: boolean;
-  yes?: boolean;
 }
 
 const DIFF_PREVIEW_LINES = 120;
@@ -101,7 +100,7 @@ export const run = async (names: string[], options: UpdateOptions): Promise<void
   }
 
   logSourceCaution();
-  const approved = await previewAndReview(selected, scope, options.yes);
+  const approved = await previewAndReview(selected, scope, options);
   if (approved.length === 0) {
     return landUpdates(moved, [], destinationOf, scope, lock, "Nothing selected.");
   }
@@ -195,7 +194,7 @@ const recordMoved = async (
 const previewAndReview = async (
   selected: OutdatedVerdict[],
   scope: Scope,
-  yes: boolean | undefined,
+  options: ReviewOptions,
 ): Promise<UpdatedFiles[]> => {
   const approved: UpdatedFiles[] = [];
   for (const verdict of selected) {
@@ -216,7 +215,7 @@ const previewAndReview = async (
   }
   const review = await reviewSkills(
     approved.map(({ verdict, files }) => ({ name: verdict.skill.name, files, verdict })),
-    yes,
+    options,
   );
   return review.approved.map(({ verdict, files }) => ({ verdict, files }));
 };

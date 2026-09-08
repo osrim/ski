@@ -63,7 +63,9 @@ A path copy does not create a canonical copy or agent link. The store is a cache
 
 ## Review gate
 
-New or changed files pass through `ui/gate.ts`. The gate lists files, runs the scan, shows findings, and returns `pass`, `declined`, or `blocked`. `blocked` sets exit code `3`.
+New or changed files pass through `ui/gate.ts`. The gate takes a `ReviewOptions` object with `yes` and `dangerousSkipCriticalApproval`. It lists files, runs the scan, shows findings, and returns `pass`, `declined`, or `blocked`. Only `blocked`, a critical finding without a terminal or the dangerous flag, sets exit code `3`.
+
+`dangerousSkipCriticalApproval` skips critical approval after findings are printed. It leaves warn finding review controlled by `yes`. Commands pass these options through every review path, including dependencies offered by `add`. The options apply only to the current invocation; placement and persistence code do not use the dangerous flag.
 
 - `add` reaches the gate for every new skill and for dependencies it offers to install.
 - `update` reaches the gate only when skill files changed. A moved revision with identical files skips it. Missing dependencies are reported, not installed.

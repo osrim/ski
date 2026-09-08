@@ -12,10 +12,11 @@ Every prompt has a flag replacement, and the replacements do not overlap:
 
 - `--all` selects skills. It never confirms a write.
 - `--yes` accepts ordinary confirmations and defaults. It never approves a critical finding.
-- A critical finding needs a terminal. Without one, the skill is skipped with exit `3`.
-- A prompt with no terminal and no flag exits `2` with a message that names the flag.
+- `--dangerous-skip-critical-approval` skips critical approval for the current invocation. It keeps file lists and findings visible and does not accept warn findings or confirm a write.
+- In `add` and `update`, a critical finding needs a terminal unless `--dangerous-skip-critical-approval` is provided. Without either, the skill is skipped with exit `3`.
+- An ordinary prompt with no terminal and no replacement flag exits `2` with a message that names the flag, except in `install`.
 
-`install` is the exception to the last rule. Without a terminal it keeps modified skills and installs the other entries, because restoring silently would destroy edits.
+Without a terminal, `install` keeps modified skills and installs the other entries, because restoring silently would destroy edits.
 
 Each skill gets at most one review question.
 

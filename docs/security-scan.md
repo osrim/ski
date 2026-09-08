@@ -6,11 +6,13 @@
 
 | severity | effect |
 | --- | --- |
-| `critical` | Blocks the skill until you approve it in a terminal. `--yes` cannot approve it. Without a terminal the skill is skipped and the command exits `3`. |
+| `critical` | Needs approval in a terminal unless `--dangerous-skip-critical-approval` is set. `--yes` cannot approve it. Without a terminal or the dangerous flag, the skill is skipped and the command exits `3`. |
 | `warn` | Pauses once per skill. `--yes` skips the pause. |
 | `info` | Never pauses. |
 
 A skill you decline is skipped. The other skills in the batch still install.
+
+`add` and `update` accept `--dangerous-skip-critical-approval` in interactive and non-interactive runs. It skips only critical approval for that invocation. The gate still lists every file, runs the scan, and prints every finding with its original severity. Warn finding review and the final write confirmation still use `--yes`. The flag is never remembered or recorded in the lockfile.
 
 An approval covers one source, path, integrity, and scope. Adding approved content to another agent does not reopen the review.
 

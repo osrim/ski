@@ -8,7 +8,7 @@ import { scopeFlag } from "../core/install/scope.ts";
 import { coordinateFor, type Source } from "../core/source/index.ts";
 import type { OutdatedVerdict } from "../core/source/upstream.ts";
 import { fetchSkillFiles, type SkillFiles } from "./flow.ts";
-import { reviewSkills } from "./gate.ts";
+import { reviewSkills, type ReviewOptions } from "./gate.ts";
 import { isInteractive, unwrap, withSpinner } from "./prompt.ts";
 import { logWarn, warn } from "./report.ts";
 import { dim, skillName, summarize } from "./style.ts";
@@ -37,7 +37,7 @@ export interface DepsContext {
   skills: DiscoveredSkill[];
   lock: Lockfile;
   scope: Scope;
-  options: { yes?: boolean };
+  options: ReviewOptions;
 }
 
 interface ResolvedDeps {
@@ -100,7 +100,7 @@ export const resolveDeps = async (
         warnings: skill.warnings ?? [],
         skill,
       })),
-      false,
+      ctx.options,
     );
     if (review.blocked) blocked = true;
     added.push(...review.approved.map(({ skill, files }) => ({ skill, files })));
