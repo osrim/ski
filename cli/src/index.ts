@@ -23,8 +23,6 @@ type CommandName = keyof typeof LOADERS;
 const isCommandName = (name: string | undefined): name is CommandName =>
   name !== undefined && name in LOADERS;
 
-const OFFLINE_COMMANDS: readonly string[] = ["list", "remove"] satisfies CommandName[];
-
 let matchedHelp: CommandHelp | undefined;
 
 const buildCli = (): CAC => {
@@ -94,13 +92,20 @@ const suggestCommand = (cli: CAC, typo: string): string | undefined =>
     ...cli.commands.flatMap((command) => command.aliasNames),
   ]);
 
+const printNotice = async (notice: Promise<string | null>): Promise<void> => {
+  const message = await notice;
+  if (message && !process.exitCode) console.error(message);
+};
+
 try {
   const argv = process.argv;
   const cli = buildCli();
   cli.parse(argv, { run: false });
+  const notice = startUpdateCheck(pkg.version, Boolean(cli.options.json));
 
   if (cli.options.version) {
     console.info(`ski/${pkg.version} ${process.platform}-${process.arch} bun-v${Bun.version}`);
+    await printNotice(notice);
     process.exit(0);
   }
 
@@ -108,6 +113,7 @@ try {
     if (isCommandName(cli.matchedCommand?.name))
       matchedHelp = (await LOADERS[cli.matchedCommand.name]()).help;
     cli.outputHelp();
+    if (!matchedHelp) await printNotice(notice);
     process.exit(0);
   }
 
@@ -115,6 +121,7 @@ try {
     const typo = argv.length > 2 && !argv[2]!.startsWith("-") ? argv[2]! : null;
     if (typo === null) {
       cli.outputHelp();
+      await printNotice(notice);
       process.exit(0);
     }
     const guess = suggestCommand(cli, typo);
@@ -131,12 +138,8 @@ try {
     process.exit(2);
   }
 
-  const notice = OFFLINE_COMMANDS.includes(cli.matchedCommand.name)
-    ? null
-    : startUpdateCheck(pkg.version, Boolean(cli.options.json));
   await cli.runMatchedCommand();
-  const message = await notice;
-  if (message && !process.exitCode) console.error(message);
+  await printNotice(notice);
 } catch (e) {
   if (e instanceof Error && (e.name === "CACError" || e.name === USAGE_ERROR)) {
     console.error(`${e.message}\nSee \`ski --help\`.`);

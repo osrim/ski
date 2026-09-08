@@ -109,3 +109,4 @@ Use these terms in code, docs, and output.
 | --- | --- | --- |
 | version | `ski`'s semver number. | revision, build |
 | release | Tagged commit and GitHub release with the binaries for one version. Stable versions also get the Homebrew formula. | publish, ship, cut |
+| update notice | Two stderr lines after a successful run that name a newer release and how to get it. Fed by a release check that runs once a day, or on the next run after a failed request or an unwritten cache. | update prompt, upgrade nag, version warning |

@@ -66,7 +66,7 @@ When you pick a scope or agents in a prompt, or pass `-g`, `-p`, or `--agent`, `
 | global lockfile | `~/.local/share/ski/ski-lock.json` | `XDG_DATA_HOME` |
 | store | `~/.local/share/ski/store` | `XDG_DATA_HOME` |
 | config | `~/.config/ski/config.json` | `XDG_CONFIG_HOME` |
-| update-check stamp | `~/.cache/ski/last-update-check` | `XDG_CACHE_HOME` |
+| update-check cache | `~/.cache/ski/last-update-check` | `XDG_CACHE_HOME` |
 
 `SKI_HOME` replaces the data and config roots at once. `SKI_HOME=/tmp/x` puts the global skills, the global lockfile, the store, and the config under `/tmp/x`. It does not move the cache.
 
@@ -123,10 +123,14 @@ Releases without path-copy support reject these entries because `copy: true` has
 | `CLAUDE_HOME` | Global Claude directory. Default `~/.claude`. |
 | `NO_COLOR` | Disable color. |
 | `FORCE_COLOR` | Enable color when stdout is not a terminal. |
-| `CI`, `NO_UPDATE_NOTIFIER`, `SKI_NO_UPDATE_NOTIFIER` | Disable the update notice. |
+| `CI`, `NO_UPDATE_NOTIFIER`, `SKI_NO_UPDATE_NOTIFIER` | Disable the update notice and its release check. |
 
 Color is also off when stdout is not a terminal or `TERM=dumb`.
 
 ## Update notice
 
-Commands that use the network check the latest GitHub release for a newer `ski` at most once a day and print a notice on stderr after the command output. The notice names `brew upgrade` when the binary is a Homebrew install and links to the latest release otherwise. No request is made when stdout is not a terminal, when `--json` is set, when `ski` runs from a Git checkout, or when one of the variables above is set.
+Every `ski` run that exits `0` prints a notice on stderr, after its own output, while the installed version is older than the latest GitHub release. This includes `ski`, `ski --version`, `ski list`, and `ski remove`. Help for a single command, such as `ski add --help`, prints no notice. The notice names `brew upgrade` when the binary is a Homebrew install and links to the latest release otherwise. It stops on the first run after you upgrade.
+
+`ski` asks GitHub for the latest release once a day and stores the check time and the version it found in the update-check cache. Runs between checks reuse the cached version. A failed request is silent and leaves the cache untouched, so the next run checks again. A cache file that does not parse, does not match the expected shape, holds the legacy bare timestamp, or records a check time in the future counts as no prior check, so the run asks GitHub again.
+
+No request is made and no notice is printed when stdout is not a terminal, when `--json` is set, when `ski` runs from a Git checkout, or when one of the variables above is set. A command that fails prints no notice.
