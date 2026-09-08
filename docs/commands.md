@@ -15,7 +15,7 @@ Commands, flags, aliases, and exit codes are compatibility contracts. Paths, env
 ## `add`
 
 ```text
-ski add <coordinate> [...skills] [-g|-p] [-a] [-y] [--agent <id>] [--copy [--path <directory>]]
+ski add <coordinate> [...skills] [-g|-p] [-a] [-y] [--agent <id>] [--copy [--path <directory>]] [--dangerous-skip-critical-approval]
 ```
 
 A coordinate names a source:
@@ -65,7 +65,7 @@ Link entries install to the agents you pass with `--agent`, or to the saved or d
 ## `update`
 
 ```text
-ski update [...skills] [-g|-p] [-a] [-y]
+ski update [...skills] [-g|-p] [-a] [-y] [--dangerous-skip-critical-approval]
 ```
 
 `update` checks every installed skill against its source, then shows and scans changed files before writing.
@@ -134,11 +134,14 @@ Each skill carries its lockfile fields (see [configuration.md](configuration.md#
 | `--agent <id>` | `add`, `install` | Install to `claude`, `opencode`, or `universal`. Repeat the flag or separate ids with commas. |
 | `-a`, `--all` | `add`, `update`, `remove` | Select every skill. It does not confirm or approve anything. |
 | `-y`, `--yes` | `add`, `install`, `update`, `remove` | Accept ordinary confirmations and defaults. It cannot approve critical findings. |
+| `--dangerous-skip-critical-approval` | `add`, `update` | Skip approval for critical findings. Dangerous. Files and findings remain visible. |
 | `--copy` | `add` | Write directories instead of links. |
 | `--path <directory>` | `add` | With `--copy`, write named skill directories below a project destination root. |
 | `--json` | `list` | Write JSON only. |
 
 `-g` and `-p` cannot be combined. Passing both exits `2`.
+
+`--dangerous-skip-critical-approval` applies only to the current invocation, including dependencies reviewed by `add`. It does not imply `--yes`, `--all`, a scope, an agent, `--copy`, or `--path`. Warn finding review and write confirmation keep their existing behavior. The flag is never saved in the lockfile or configuration and has no environment-variable equivalent.
 
 `add` asks for the scope when neither flag is present. `--path` selects project scope without asking. The other commands default to project scope.
 
@@ -155,9 +158,11 @@ Running a command from your home directory selects global scope.
 | Path-copy destination | Pass `--copy --path <directory>`. Do not pass an agent flag. |
 | Write confirmation | Pass `--yes`. |
 | Warn finding review | Pass `--yes`. |
-| Critical finding approval | None. Run in a terminal. |
+| Critical finding approval | Run in a terminal, or pass `--dangerous-skip-critical-approval` to skip approval. |
 
 A prompt with no terminal and no flag exits `2`, except in `install`, which keeps modified skills and continues.
+
+Critical findings blocked without a terminal exit `3` unless `--dangerous-skip-critical-approval` is present.
 
 Ctrl-C exits `130`. Files already written stay written.
 
@@ -179,13 +184,13 @@ ski install --agent claude --yes
 
 `git` must be on `PATH`. `ski install` exits `0` when every entry in `ski-lock.json` is on disk with its recorded integrity. `CI` disables the update notice.
 
-`ski add` and `ski update` also run without a terminal. `--yes` accepts warn findings. A critical finding exits `3` and needs a terminal. `ski list --json` prints machine-readable output.
+`ski add` and `ski update` also run without a terminal. `--yes` accepts warn findings. A critical finding exits `3` unless `--dangerous-skip-critical-approval` skips approval. `ski list --json` prints machine-readable output.
 
-Use CI to keep a repository's published skill copies current:
+For reviewed sources whose critical findings you accept, use CI to keep a repository's published skill copies current. Every run still lists files, scans them, and prints all findings:
 
 ```sh
-ski add owner/skills --all --yes --copy --path ./custom-directory
-ski update --all --yes
+ski add owner/skills --all --yes --copy --path ./custom-directory --dangerous-skip-critical-approval
+ski update --all --yes --dangerous-skip-critical-approval
 git diff --exit-code ski-lock.json ./custom-directory
 ```
 
@@ -196,5 +201,5 @@ git diff --exit-code ski-lock.json ./custom-directory
 | `0` | Success or nothing to do. |
 | `1` | A skill failed. The rest of the batch still ran. |
 | `2` | Invalid usage, or a prompt had no terminal and no flag. |
-| `3` | Critical findings blocked a skill in `add` or `update`. |
+| `3` | Critical findings blocked at least one skill in `add` or `update` without `--dangerous-skip-critical-approval`. |
 | `130` | Cancelled. |

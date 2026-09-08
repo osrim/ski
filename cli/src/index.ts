@@ -35,6 +35,7 @@ const buildCli = (): CAC => {
     .option("-p, --project", "Use project scope")
     .option("-a, --all", "Select all skills")
     .option("-y, --yes", "Skip ordinary confirmations")
+    .option("--dangerous-skip-critical-approval", "Skip approval for critical findings. Dangerous.")
     .option("--agent <id>", "Agents to install to: claude, opencode, universal. Repeatable")
     .option("--copy", "Copy directories instead of linking")
     .option(
@@ -59,6 +60,7 @@ const buildCli = (): CAC => {
     .option("-p, --project", "Use project scope")
     .option("-a, --all", "Select all outdated skills")
     .option("-y, --yes", "Skip ordinary confirmations")
+    .option("--dangerous-skip-critical-approval", "Skip approval for critical findings. Dangerous.")
     .action(async (skills, options) => (await LOADERS.update()).run(skills, options));
   cli
     .command("remove [...skills]", "Remove installed skills")

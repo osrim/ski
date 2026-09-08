@@ -25,7 +25,7 @@ import { parseCoordinate, type Coordinate } from "../core/source/coordinate.ts";
 import { usageError, USAGE_ERROR } from "../core/usage.ts";
 import { resolveDeps, type DepsContext } from "../ui/deps.ts";
 import { confirm, fetchSkillFiles, land, type SkillFiles } from "../ui/flow.ts";
-import { reviewSkills } from "../ui/gate.ts";
+import { reviewSkills, type ReviewOptions } from "../ui/gate.ts";
 import type { CommandHelp } from "../ui/help.ts";
 import { pickSkillsToAdd, type Extension } from "../ui/pick.ts";
 import { fail } from "../ui/prompt.ts";
@@ -60,9 +60,8 @@ export const help: CommandHelp = {
   ],
 };
 
-interface AddOptions extends ScopeOptions {
+interface AddOptions extends ScopeOptions, ReviewOptions {
   all?: boolean;
-  yes?: boolean;
   agent?: string | string[];
   copy?: boolean;
   path?: string;
@@ -136,8 +135,7 @@ export const run = async (
     scope,
     options,
   };
-  const approved =
-    picked.skills.length > 0 ? await approveNew(picked.skills, ctx, options.yes) : [];
+  const approved = picked.skills.length > 0 ? await approveNew(picked.skills, ctx) : [];
   if (approved.length === 0 && picked.extend.length === 0) {
     p.outro("Nothing selected.");
     return;
@@ -247,11 +245,7 @@ const resolveSource = async (source: Source, coordinate: Coordinate): Promise<Fe
   return { rev, skills };
 };
 
-const approveNew = async (
-  skills: DiscoveredSkill[],
-  ctx: DepsContext,
-  yes: boolean | undefined,
-): Promise<SkillFiles[]> => {
+const approveNew = async (skills: DiscoveredSkill[], ctx: DepsContext): Promise<SkillFiles[]> => {
   logSourceCaution();
   const review = await reviewSkills(
     (await fetchSkillFiles(ctx.source, ctx.rev, skills)).map(({ skill, files }) => ({
@@ -260,7 +254,7 @@ const approveNew = async (
       warnings: skill.warnings ?? [],
       skill,
     })),
-    yes,
+    ctx.options,
   );
   if (review.approved.length === 0) return [];
   const approved = review.approved.map(({ skill, files }) => ({ skill, files }));
