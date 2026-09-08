@@ -160,9 +160,7 @@ Running a command from your home directory selects global scope.
 | Warn finding review | Pass `--yes`. |
 | Critical finding approval | Run in a terminal, or pass `--dangerous-skip-critical-approval` to skip approval. |
 
-A prompt with no terminal and no flag exits `2`, except in `install`, which keeps modified skills and continues.
-
-Critical findings blocked without a terminal exit `3` unless `--dangerous-skip-critical-approval` is present.
+An ordinary prompt with no terminal and no replacement flag exits `2`. In `add` and `update`, critical findings instead block the skill with exit `3` unless `--dangerous-skip-critical-approval` is provided. `install` keeps modified skills and continues when there is no terminal.
 
 Ctrl-C exits `130`. Files already written stay written.
 
