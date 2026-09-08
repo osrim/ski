@@ -206,12 +206,10 @@ const approvedMissingAgentsByPath = async (
     `Checking ${candidates.length} installed skill(s) against ${source.display}`,
     () =>
       Promise.all(
-        candidates.map(
-          async (skill): Promise<[DiscoveredSkill, string]> => [
-            skill,
-            integrityOf(await source.fetchFiles(rev.commit, skill.path)),
-          ],
-        ),
+        candidates.map(async (skill): Promise<[DiscoveredSkill, string]> => [
+          skill,
+          integrityOf(await source.fetchFiles(rev.commit, skill.path)),
+        ]),
       ),
     (checked) => `Checked ${checked.length} installed skill(s)`,
   );
